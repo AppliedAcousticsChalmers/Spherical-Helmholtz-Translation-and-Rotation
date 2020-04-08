@@ -1,0 +1,17 @@
+name: faheltzmm_dev
+dependencies:
+  - numpy
+  - scipy
+  - jupyter
+  - snakeviz
+  - line_profiler
+  - ipdb
+  - sphinx
+  - pytest
+  - pytest-cov
+  - flake8
+  - flake8-docstrings
+  - pip
+  - pip:
+    - -e .
+    - sphinx-rtd-theme
