@@ -10,7 +10,10 @@ def scipy_norm(orders, modes):
     yields results with the same scale as the scipy implementations.
     """
     from scipy.special import factorial
-    return (2 * factorial(orders + modes) / (2 * orders + 1) / factorial(orders - modes))**0.5
+    numer = 2 * factorial(orders + modes)
+    denom = factorial(orders - modes) * (2 * orders + 1)
+    with np.errstate(divide='ignore'):
+        return np.where(orders < modes, 0, (numer / denom)**0.5)
 
 
 def complement_norm(x, modes):
@@ -105,4 +108,17 @@ def mode_expansion(sectorial_coefficient, x, order, normalization='orthonormal',
         legendre *= scipy_norm(order, modes) * mode_scale
     else:
         raise ValueError('Unknown normalization option: `{}`'.format(normalization))
+    return legendre
+
+def legendre_set(max_order, x, normalization='orthonormal', out=None, direction='increase_order'):
+    x = np.asarray(x)
+    sectorial_values = sectorial(max_order, x, normalization='complement')
+
+    legendre = out[:max_order + 1, :max_order + 1] if out is not None else np.zeros((max_order + 1, max_order + 1) + x.shape)
+    if 'order' in direction.lower():
+        for mode in range(0, max_order + 1):
+            order_expansion(sectorial_values[mode], x, mode, max_order, out=legendre[mode:, mode], normalization=normalization)
+    elif 'mode' in direction.lower():
+        for order in range(0, max_order + 1):
+            mode_expansion(sectorial_values[order], x, order, out=legendre[order, :order + 1], normalization=normalization)
     return legendre
