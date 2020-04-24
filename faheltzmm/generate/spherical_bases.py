@@ -2,8 +2,8 @@
 
 import numpy as np
 from scipy.special import sph_harm, spherical_jn, spherical_yn
-from .coordinates import cartesian_2_spherical
-from .indexing import SphericalHarmonicsIndexer
+from ..coordinates import cartesian_2_spherical
+from ..indexing import SphericalHarmonicsIndexer
 
 
 def spherical_hn(n, z, derivative=False):

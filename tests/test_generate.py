@@ -14,12 +14,12 @@ wavenumbers = np.random.uniform(low=0.1, high=2 * max_order, size=(5))
 @pytest.mark.parametrize('base', ['regular', 'singular'])
 def test_bases_generation(base):
     if base == 'regular':
-        radial_func = faheltzmm.generate.spherical_jn
+        radial_func = faheltzmm.generate.spherical_bases.spherical_jn
         bases = faheltzmm.generate.regular_base_set
         modes = faheltzmm.generate.regular_modes
         base = faheltzmm.generate.regular_base
     elif base == 'singular':
-        radial_func = faheltzmm.generate.spherical_hn
+        radial_func = faheltzmm.generate.spherical_bases.spherical_hn
         bases = faheltzmm.generate.singular_base_set
         modes = faheltzmm.generate.singular_modes
         base = faheltzmm.generate.singular_base
@@ -36,7 +36,7 @@ def test_bases_generation(base):
             order_mode.append(base(order, mode, positions, wavenumbers))
             manual.append([])
             for wavenumber in wavenumbers:
-                manual[-1].append(radial_func(order, wavenumber * r) * faheltzmm.generate.sph_harm(mode, order, theta, phi))
+                manual[-1].append(radial_func(order, wavenumber * r) * faheltzmm.generate.spherical_bases.sph_harm(mode, order, theta, phi))
     order_all_modes = np.concatenate(order_all_modes, axis=0)
     order_mode = np.stack(order_mode, axis=0)
     manual = np.stack(manual, axis=0)
