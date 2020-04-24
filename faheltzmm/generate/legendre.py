@@ -46,3 +46,32 @@ def sectorial(max_order, x, normalization='orthonormal', out=None):
     else:
         raise ValueError('Unknown normalization option: `{}`'.format(normalization))
     return legendre
+
+
+def order_expansion(sectorial_coefficient, x, mode, max_order, normalization='orthonormal', out=None):
+    """Expand the sectorial coefficient of a given mode to higher orders."""
+    x = np.asarray(x)
+    sectorial_coefficient = np.asarray(sectorial_coefficient)
+    n_orders = max_order - mode + 1
+    legendre = out[:n_orders] if out is not None else np.zeros((n_orders, ) + sectorial_coefficient.shape)
+    legendre[-1] = 0  # The loop wil access the -1 element in the first iteration. If this is a view the value might not be zero.
+    legendre[0] = sectorial_coefficient
+
+    for idx, order in enumerate(range(mode + 1, max_order + 1), 1):
+        legendre[idx] = (
+            ((2 * order - 1) * (2 * order + 1) / (order + mode) / (order - mode))**0.5
+            * x * legendre[idx - 1]
+            - ((2 * order + 1) * (order - mode - 1) * (order + mode - 1) / (2 * order - 3) / (order + mode) / (order - mode))**0.5
+            * legendre[idx - 2]
+        )
+
+    if 'complement' in normalization.lower():
+        return legendre
+    mode_scale = (1 - x**2) ** (mode / 2)
+    if 'orthonormal' in normalization.lower():
+        legendre *= mode_scale
+    elif 'scipy' in normalization.lower():
+        legendre *= scipy_norm(np.arange(mode, max_order + 1).reshape([-1] + [1] * np.ndim(x)), mode) * mode_scale
+    else:
+        raise ValueError('Unknown normalization option: `{}`'.format(normalization))
+    return legendre
