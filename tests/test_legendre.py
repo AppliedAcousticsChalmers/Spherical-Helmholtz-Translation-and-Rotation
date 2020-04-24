@@ -55,3 +55,32 @@ def test_order_expansion(x, mode, max_order):
     np.testing.assert_allclose(implemented_complement, out_arr_complement)
     np.testing.assert_allclose(implemented_orthonormal, out_arr_orthonormal)
     np.testing.assert_allclose(implemented_scipy, out_arr_scipy)
+
+
+@pytest.mark.parametrize('x', nice_x + difficult_x)
+@pytest.mark.parametrize('order', [8, 12, 60])
+def test_mode_expansion(x, order):
+    sectorial = faheltzmm.generate.legendre.sectorial(order, x, normalization='complementary')[-1]
+
+    implemented_orthonormal = faheltzmm.generate.legendre.mode_expansion(sectorial, x, order, normalization='orthonormal')
+    implemented_complement = faheltzmm.generate.legendre.mode_expansion(sectorial, x, order, normalization='complementary')
+    implemented_scipy = faheltzmm.generate.legendre.mode_expansion(sectorial, x, order, normalization='scipy')
+
+    out_arr_complement = np.zeros(implemented_orthonormal.shape)
+    out_arr_orthonormal = np.zeros(implemented_orthonormal.shape)
+    out_arr_scipy = np.zeros(implemented_orthonormal.shape)
+    faheltzmm.generate.legendre.mode_expansion(sectorial, x, order, out=out_arr_complement, normalization='complement')
+    faheltzmm.generate.legendre.mode_expansion(sectorial, x, order, out=out_arr_orthonormal, normalization='orthonormal')
+    faheltzmm.generate.legendre.mode_expansion(sectorial, x, order, out=out_arr_scipy, normalization='scipy')
+
+    modes = np.arange(order + 1).reshape([-1] + [1] * np.ndim(x))
+    complementary_norm = ((1 - x**2) ** 0.5) ** modes
+    scipy_norm = (2 * scipy.special.factorial(modes + order) / (2 * order + 1) / scipy.special.factorial(order - modes))**0.5
+    scipy_lpmv = scipy.special.lpmv(modes, order, x)
+
+    np.testing.assert_allclose(scipy_lpmv, implemented_scipy)
+    np.testing.assert_allclose(implemented_orthonormal * scipy_norm, implemented_scipy)
+    np.testing.assert_allclose(implemented_orthonormal, implemented_complement * complementary_norm)
+    np.testing.assert_allclose(implemented_complement, out_arr_complement)
+    np.testing.assert_allclose(implemented_orthonormal, out_arr_orthonormal)
+    np.testing.assert_allclose(implemented_scipy, out_arr_scipy)
