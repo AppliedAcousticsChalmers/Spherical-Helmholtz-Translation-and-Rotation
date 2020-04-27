@@ -110,7 +110,8 @@ def mode_expansion(sectorial_coefficient, x, order, normalization='orthonormal',
         raise ValueError('Unknown normalization option: `{}`'.format(normalization))
     return legendre
 
-def legendre_set(max_order, x, normalization='orthonormal', out=None, direction='increase_order'):
+
+def legendre(max_order, x, normalization='orthonormal', out=None, direction='increase_order'):
     x = np.asarray(x)
     sectorial_values = sectorial(max_order, x, normalization='complement')
 
