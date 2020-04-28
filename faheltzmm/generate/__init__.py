@@ -4,3 +4,4 @@ from .spherical_bases import (
 )
 
 from ._legendre import legendre
+from ._spherical_harmonics import spherical_harmonics
