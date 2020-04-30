@@ -89,17 +89,17 @@ def test_mode_expansion(x, order):
 @pytest.mark.parametrize('max_order', [0, 1, 5, 12])
 @pytest.mark.parametrize('x', nice_x + difficult_x)
 @pytest.mark.parametrize('direction', ['orders', 'modes'])
-def test_legendre(max_order, x, direction):
-    implemented_complement = faheltzmm.generate._legendre.legendre(max_order, x, normalization='complement', direction=direction)
-    implemented_orthonormal = faheltzmm.generate._legendre.legendre(max_order, x, normalization='orthonormal', direction=direction)
-    implemented_scipy = faheltzmm.generate._legendre.legendre(max_order, x, normalization='scipy', direction=direction)
+def test_legendre_all(max_order, x, direction):
+    implemented_complement = faheltzmm.generate._legendre.legendre_all(max_order, x, normalization='complement', direction=direction)
+    implemented_orthonormal = faheltzmm.generate._legendre.legendre_all(max_order, x, normalization='orthonormal', direction=direction)
+    implemented_scipy = faheltzmm.generate._legendre.legendre_all(max_order, x, normalization='scipy', direction=direction)
 
     out_arr_complement = np.zeros(implemented_orthonormal.shape)
     out_arr_orthonormal = np.zeros(implemented_orthonormal.shape)
     out_arr_scipy = np.zeros(implemented_orthonormal.shape)
-    faheltzmm.generate._legendre.legendre(max_order, x, out=out_arr_complement, normalization='complement', direction=direction)
-    faheltzmm.generate._legendre.legendre(max_order, x, out=out_arr_orthonormal, normalization='orthonormal', direction=direction)
-    faheltzmm.generate._legendre.legendre(max_order, x, out=out_arr_scipy, normalization='scipy', direction=direction)
+    faheltzmm.generate._legendre.legendre_all(max_order, x, out=out_arr_complement, normalization='complement', direction=direction)
+    faheltzmm.generate._legendre.legendre_all(max_order, x, out=out_arr_orthonormal, normalization='orthonormal', direction=direction)
+    faheltzmm.generate._legendre.legendre_all(max_order, x, out=out_arr_scipy, normalization='scipy', direction=direction)
 
     orders = np.arange(max_order + 1).reshape([max_order + 1, 1] + [1] * np.ndim(x))
     modes = np.arange(max_order + 1).reshape([1, max_order + 1] + [1] * np.ndim(x))

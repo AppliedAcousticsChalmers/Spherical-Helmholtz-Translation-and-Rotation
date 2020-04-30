@@ -3,5 +3,5 @@ from .spherical_bases import (
     regular_base, regular_modes, regular_base_set
 )
 
-from ._legendre import legendre
-from ._spherical_harmonics import spherical_harmonics
+from ._legendre import legendre_all
+from ._spherical_harmonics import spherical_harmonics_all

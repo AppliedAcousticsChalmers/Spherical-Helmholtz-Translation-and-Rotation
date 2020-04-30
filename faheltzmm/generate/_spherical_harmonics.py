@@ -1,26 +1,26 @@
 """Implementations for spherical harmonics."""
 
 import numpy as np
-from . import legendre
+from . import legendre_all
 
 
-def spherical_harmonics(max_order, colatitude=None, azimuth=None, cosine_colatitude=None, return_negative_m=True):
+def spherical_harmonics_all(max_order, colatitude=None, azimuth=None, cosine_colatitude=None, return_negative_m=True):
     if return_negative_m is True:
-        return spherical_harmonics(max_order, colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude, return_negative_m='full')
+        return spherical_harmonics_all(max_order, colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude, return_negative_m='full')
     if return_negative_m is False:
-        return spherical_harmonics(max_order, colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude, return_negative_m='positive')
+        return spherical_harmonics_all(max_order, colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude, return_negative_m='positive')
     if 'half' in return_negative_m.lower():
-        return spherical_harmonics(max_order, colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude, return_negative_m='positive')
+        return spherical_harmonics_all(max_order, colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude, return_negative_m='positive')
     if 'full' in return_negative_m.lower():
-        return positive_to_full(spherical_harmonics(max_order, colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude, return_negative_m='positive'))
+        return positive_to_full(spherical_harmonics_all(max_order, colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude, return_negative_m='positive'))
     if 'compact' in return_negative_m.lower():
-        return positive_to_compact(spherical_harmonics(max_order, colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude, return_negative_m='positive'))
+        return positive_to_compact(spherical_harmonics_all(max_order, colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude, return_negative_m='positive'))
 
     cosine_colatitude = cosine_colatitude if cosine_colatitude is not None else np.cos(colatitude)
     azimuth = azimuth if np.iscomplexobj(azimuth) else np.exp(1j * azimuth)
     angles = np.broadcast(cosine_colatitude, azimuth)
 
-    legendre_values = legendre(max_order, cosine_colatitude, normalization='orthonormal').reshape((max_order + 1, max_order + 1) + (1,) * (angles.ndim - np.ndim(cosine_colatitude)) + np.shape(cosine_colatitude))
+    legendre_values = legendre_all(max_order, cosine_colatitude, normalization='orthonormal').reshape((max_order + 1, max_order + 1) + (1,) * (angles.ndim - np.ndim(cosine_colatitude)) + np.shape(cosine_colatitude))
     azimuth = azimuth ** np.arange(max_order + 1).reshape([-1] + [1] * angles.ndim)
     harmonics = np.zeros((max_order + 1, max_order + 1) + angles.shape, dtype=complex)
     harmonics[:, :max_order + 1] = legendre_values * azimuth

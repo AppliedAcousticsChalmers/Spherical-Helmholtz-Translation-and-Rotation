@@ -31,7 +31,7 @@ def test_scipy_conformity(max_order, colatitude, azimuth):
     pos_m = np.arange(max_order + 1).reshape([1, -1] + [1] * angles.ndim)
     all_m = np.concatenate([pos_m, -pos_m[:, :0:-1]], axis=1)
     scipy_all_m = np.nan_to_num(scipy.special.sph_harm(all_m, all_n, azimuth, colatitude))
-    implemented_all_m = faheltzmm.generate._spherical_harmonics.spherical_harmonics(max_order, colatitude, azimuth, return_negative_m=True)
+    implemented_all_m = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True)
 
     np.testing.assert_allclose(implemented_all_m, scipy_all_m, atol=1e-15)
 
@@ -39,7 +39,7 @@ def test_scipy_conformity(max_order, colatitude, azimuth):
 @pytest.mark.parametrize('max_order', [0, 1, 2, 3])
 @pytest.mark.parametrize('colatitude, azimuth', same_dimension_angles + broadcasting_angles)
 def test_broadcasting(max_order, colatitude, azimuth):
-    implemented = faheltzmm.generate._spherical_harmonics.spherical_harmonics(max_order, colatitude, azimuth, return_negative_m=False).shape
+    implemented = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=False).shape
     expected = (max_order + 1, max_order + 1) + np.broadcast(colatitude, azimuth).shape
     assert implemented == expected, "Broadcasted array has unexpected shape. Got {}, expected {}".format(implemented, expected)
 
@@ -70,8 +70,8 @@ def test_show_index_scheme(max_order):
 @pytest.mark.parametrize('max_order', [0, 1, 2, 6])
 @pytest.mark.parametrize('colatitude, azimuth', [(0.5, 0.5)] + same_dimension_angles)
 def test_positive_output_format(max_order, colatitude, azimuth):
-    positive = faheltzmm.generate._spherical_harmonics.spherical_harmonics(max_order, colatitude, azimuth, return_negative_m=False)
-    full = faheltzmm.generate._spherical_harmonics.spherical_harmonics(max_order, colatitude, azimuth, return_negative_m=True)
+    positive = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=False)
+    full = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True)
 
     positive_to_full = faheltzmm.generate._spherical_harmonics.positive_to_full(positive)
     full_to_positive = faheltzmm.generate._spherical_harmonics.full_to_positive(full)
@@ -89,8 +89,8 @@ def test_positive_output_format(max_order, colatitude, azimuth):
 @pytest.mark.parametrize('max_order', [0, 1, 2, 6])
 @pytest.mark.parametrize('colatitude, azimuth', [(0.5, 0.5)] + same_dimension_angles)
 def test_compact_output_format(max_order, colatitude, azimuth):
-    full = faheltzmm.generate._spherical_harmonics.spherical_harmonics(max_order, colatitude, azimuth, return_negative_m=True)
-    compact = faheltzmm.generate._spherical_harmonics.spherical_harmonics(max_order, colatitude, azimuth, return_negative_m='compact')
+    full = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True)
+    compact = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m='compact')
 
     full_to_compact = faheltzmm.generate._spherical_harmonics.full_to_compact(full)
     compact_to_full = faheltzmm.generate._spherical_harmonics.compact_to_full(compact)
