@@ -1,7 +1,7 @@
 """Implementations for spherical harmonics."""
 
 import numpy as np
-from . import legendre_all
+from ._legendre import legendre_all
 
 
 def spherical_harmonics_all(max_order, colatitude=None, azimuth=None, cosine_colatitude=None, return_negative_m=True):
@@ -15,6 +15,7 @@ def spherical_harmonics_all(max_order, colatitude=None, azimuth=None, cosine_col
         return positive_to_full(spherical_harmonics_all(max_order, colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude, return_negative_m='positive'))
     if 'compact' in return_negative_m.lower():
         return positive_to_compact(spherical_harmonics_all(max_order, colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude, return_negative_m='positive'))
+    # TODO: Add flat indexing scheme.
 
     cosine_colatitude = cosine_colatitude if cosine_colatitude is not None else np.cos(colatitude)
     azimuth = azimuth if np.iscomplexobj(azimuth) else np.exp(1j * azimuth)
@@ -118,6 +119,10 @@ def show_index_scheme(max_order, return_negative_m=True):
     np.ndarray
         Object array comtaining index tuples (order, mode) at the corresponding positions.
     """
+
+    # TODO: Move this to the indexing module.
+    # TODO: Add flat indexing scheme.
+    # TODO: Make this usable for conversions.
     if return_negative_m is True:
         return show_index_scheme(max_order=max_order, return_negative_m='full')
     if return_negative_m is False:
