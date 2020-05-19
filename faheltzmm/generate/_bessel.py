@@ -18,13 +18,13 @@ def spherical_hn(n, z, derivative=False):
     return spherical_jn(n, z, derivative=derivative) + 1j * spherical_yn(n, z, derivative=derivative)
 
 
-def spherical_jn_all(max_order, z):
-    return spherical_jn(np.arange(max_order + 1).reshape([-1] + [1] * np.ndim(z)), z)
+def spherical_jn_all(max_order, z, derivative=False):
+    return spherical_jn(np.arange(max_order + 1).reshape([-1] + [1] * np.ndim(z)), z, derivative=derivative)
 
 
-def spherical_yn_all(max_order, z):
-    return spherical_yn(np.arange(max_order + 1).reshape([-1] + [1] * np.ndim(z)), z)
+def spherical_yn_all(max_order, z, derivative=False):
+    return spherical_yn(np.arange(max_order + 1).reshape([-1] + [1] * np.ndim(z)), z, derivative=derivative)
 
 
-def spherical_hn_all(max_order, z):
-    return spherical_hn(np.arange(max_order + 1).reshape([-1] + [1] * np.ndim(z)), z)
+def spherical_hn_all(max_order, z, derivative=False):
+    return spherical_hn(np.arange(max_order + 1).reshape([-1] + [1] * np.ndim(z)), z, derivative=derivative)
