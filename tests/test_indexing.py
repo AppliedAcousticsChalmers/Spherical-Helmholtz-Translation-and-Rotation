@@ -92,6 +92,7 @@ def test_nonnegative_indices(order, scheme):
             assert nonnegative_components[idx] == (n, m), f'Failed non-negative modes extraction for scheme {scheme} at order {order}, expected {(n, m)}, got {nonnegative_components[idx]}'
             idx += 1
 
+
 @pytest.mark.parametrize('scheme', ['full', 'compact', 'linear'])
 @pytest.mark.parametrize('order', [0, 1, 4])
 def test_nonpositive_indices(order, scheme):
@@ -109,8 +110,10 @@ def test_nonpositive_indices(order, scheme):
 def test_sectorial_indices(order, scheme):
     all_components = faheltzmm.indexing.expansions(order, scheme)
     sectorial_components = all_components[faheltzmm.indexing.expansions(order, scheme, 'sectorial')]
-    idx = 0
-    for n in range(order + 1):
+
+    assert sectorial_components[0] == (0, 0), f'Failed sectorial_components modes extraction for scheme {scheme} at order {order}, expected {(n, m)}, got {sectorial_components[0]}'
+    idx = 1
+    for n in range(1, order + 1):
         for m in [-n, n]:
             assert sectorial_components[idx] == (n, m), f'Failed sectorial_components modes extraction for scheme {scheme} at order {order}, expected {(n, m)}, got {sectorial_components[idx]}'
             idx += 1

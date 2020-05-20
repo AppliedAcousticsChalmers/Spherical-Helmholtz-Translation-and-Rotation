@@ -11,30 +11,62 @@ def expansions(x, scheme, new=None):
     or expansion coefficients. Below is a description of how the (order, mode)
     is mapped to indices in a matrix A[].
 
-    - Full
-        This scheme is indexed with A[n,m] for all indices.
-        This relies on python reverse indexing for m<0, i.e. A[n,-|m|].
-        Uses a (N+1, 2N+1) matrix to store the (N+1)^2 values, i.e the sparsity goes to 50%.
-    - Compact
-        This scheme is indexed with A[n,m] for m>=0, and A[|m|-1, n] for m<0 (or A[-(|m|+1), n]),
-        i.e. the negative coefficients for a given order are stored in a single column.
-    - Linear
-        This scheme stores the coefficients in a 1D array of length (N+1)^2, which is indexed
-        with A[n^2 + n + m].
-
     This function has three distinct modes, controlled by the inputs.
     - Convert
         This mode is activated by passing an ndarray as the first argument.
         The input ndarray fill be converted from the `original` indexing scheme
         to the `new` indexing scheme.
+        In the "convert" mode, both `scheme` and `new` has to be given,
+        and both have to be one of "full", 'compact" or "linear".
     - Indices
-        This is used when the first argument is an integer, and the other two arguments are string with schemes.
+        This is used when the first argument is an integer, and the other two arguments are strings with schemes.
         The output will be two nested lists, (n, m) which can be sed to index an array of the `scheme` scheme
-        to convert it to the `new` scheme. Not that this simple indexing convertion cannot convert to the full scheme.
+        to convert it to the `new` scheme. Note that this simple indexing convertion cannot convert to the full scheme.
+        In this mode, `scheme` has to be one of "full", "compact" or "linear", while "new" can be one of the subset schemes.
     - Display
         This mode is activated by passing an order as the first argument, a scheme as the second argument,
         and no third argument. The output will be an ndarray with tuples (n,m) showing
-        how the scheme is organized.
+        how the scheme is organized. In this mode, "scheme" can be any of the schemes.
+
+    Available schemes
+    -----------------
+    In the following description [..] is used to indicate indexing of an ndarray, and (n,m)
+    denotes the order n and mode m ot a coefficient or spherical basis.
+    - Full
+        This scheme is indexed with [n,m] -> (n,m) for all indices.
+        This relies on python reverse indexing for m<0, i.e. [n,-|m|] -> (n,m) for m<0.
+        Uses a (N+1, 2N+1) matrix to store the (N+1)^2 values, i.e the sparsity goes to 50%.
+    - Compact
+        This scheme stores the positive modes in the lower triangular half
+        of the array, i.e. [n,m] -> (n,m) for m>=0.
+        The negative coefficients for a given order are stored in a single column,
+        i.e. [n,m] -> (m,-n-1) for m>n, or [-m-1, n] -> (n,m) for m<0.
+    - Linear
+        This scheme stores the coefficients in a 1D array of length (N+1)^2,
+        which is indexed as [n^2 + n + m] -> (n,m) or [idx] -> (n=floor(sqrt(idx)), m=idx - n^2 - n).
+    - Zonal
+        This includes only the m=0 coefficients, stored as [n] -> (n, 0).
+    - Positive
+        This includes only coefficients where m>0, stored as [(1,1),(2,1),(2,2),(3,1)...
+    - Negative
+        This includes only coefficients where m<0, stored as [(1,-1),(2,-1),(2,-2),(3,-1)...
+    - Non-negative
+        This includes only coefficients where m>=0, stored as [(0,0),(1,0),(1,1),(2,0),(2,1)...
+    - Non-positive
+        This includes only coefficients where m<=0, stored as [(0,0),(1,0),(1,-1),(2,0),(2,-1)...
+    - Sectorial
+        This includes coefficients where n=|m|, stored as [(0,0),(1,-1),(1,1),(2,-2),(2,2)...
+    - Positive sectorial
+        This includes coefficients where n=m>0, stored as [(1,1),(2,2),(3,3)...
+    - Negative sectorial
+        This includes coefficients where n=-m>0, stored as [(1,-1),(2,-2),(3,-3)...
+    - Tesseral
+        This includes coefficients where 0<|m|<n, stored as [(2,-1),(2,1),(3,-2),(3,-1),(3,1),(3,2)...
+    - Positive tesseral
+        This includes coefficients where 0<m<n, stored as [(2,1),(3,1),(3,2),(4,1)...
+    - Negative tesseral
+        This includes coefficients where 0<-m<n, stored as [(2,-1),(3,-1),(3,-2),(4,-1)...
+
 
     Parameters
     ----------
@@ -42,12 +74,11 @@ def expansions(x, scheme, new=None):
         If an int is passed it is used as the maximum order for the conversion, and an indexing convertion scheme is returned.
         If a ndarray is passed it will be converted from the original scheme to the new scheme.
     scheme: string
-        The original scheme, one of "full", "compact", "linear".
         Specifies the scheme of the original data, either the input ndarray x,
         or the ndarray which should be indexed with the conversion scheme.
     new: string
-        The new scheme, one of "full", "compact", "linear".
-        Selects the new scheme for the data. Leave this out to display the `scheme` up to order `x`.
+        The new scheme. Selects the new scheme for the data.
+        Leave this out to display the `scheme` up to order `x`.
     """
     if type(x) is int:
         if new is None:
@@ -73,13 +104,13 @@ def expansions(x, scheme, new=None):
                 return tesseral(x)
             if 'zonal' in new.lower():
                 return zonal(x)
-            if 'nonnegative' in new.lower():
-                return nonnegative(x)
-            if 'nonpositive' in new.lower():
-                return nonpositive(x)
             if 'positive' in new.lower():
+                if 'non' in new.lower():
+                    return nonpositive(x)
                 return positive(x)
             if 'negative' in new.lower():
+                if 'non' in new.lower():
+                    return nonnegative(x)
                 return negative(x)
         if 'compact' in scheme.lower():
             if 'full' in new.lower():
@@ -122,26 +153,35 @@ def show_scheme(order, form='full'):
         for m in range(1, n + 1):
             full[n, m] = (n, m)
             full[n, -m] = (n, -m)
-    if 'full' in form.lower():
-        return full
-    if 'compact' in form.lower():
-        return full[compact(order)]
-    if 'linear' in form.lower():
-        return full[linear(order)]
+    return full[expansions(order, 'full', form)]
 
 
 def full_indices(n, m):
-    """Find the indices of coefficients of order n and mode m in the "full" scheme."""
+    """Find the indices of coefficients of order n and mode m in the "full" scheme.
+
+    The full scheme is indexed using [n,m] for all n and m.
+    This relies on reverse indexing in python and assumes that the array is
+    large enough so that there is no overlap between the positive and negative modes.
+    """
     return n, m
 
 
 def compact_indices(n, m):
-    """Find the indices of coefficients of order n and mode m in the "compact" scheme."""
+    """Find the indices of coefficients of order n and mode m in the "compact" scheme.
+
+    This scheme is indexed with [n,m] for m>=0, and for m<0 one of
+    [|m|-1, n], [-(|m|+1), n], [-m-1, n], which are equivalent,
+    i.e. the negative coefficients for a given order are stored in a single column.
+    """
     return np.where(m >= 0, n, - m - 1), np.where(m >= 0, m, n)
 
 
 def linear_indices(n, m):
-    """Find the indices of coefficients of order n and mode m in the "linear" scheme."""
+    """Find the indices of coefficients of order n and mode m in the "linear" scheme.
+
+    This scheme is indexed with [n^2 + n + m], i.e. the coefficients are all stored
+    in a single dimension.
+    """
     return n**2 + n + m
 
 
@@ -155,10 +195,10 @@ def compact(order):
 
 def linear(order):
     """Create linear coefficient scheme."""
-    return (
-        np.array([n for n in range(order + 1) for m in range(-n, n + 1)], dtype=int),
-        np.array([m for n in range(order + 1) for m in range(-n, n + 1)], dtype=int)
-    )
+    idx = np.arange((order + 1)**2)
+    n = np.floor(idx**0.5).astype(int)
+    m = idx - n**2 - n
+    return n, m
 
 
 def positive(order):
@@ -201,8 +241,8 @@ def zonal(order):
 def sectorial(order):
     """Create sectorial modes only linear coefficient scheme."""
     return (
-        np.array([n for n in range(order + 1) for m in [-n, n]], dtype=int),
-        np.array([m for n in range(order + 1) for m in [-n, n]], dtype=int),
+        np.array([0] + [n for n in range(1, order + 1) for m in [-n, n]], dtype=int),
+        np.array([0] + [m for n in range(1, order + 1) for m in [-n, n]], dtype=int),
     )
 
 
