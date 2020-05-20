@@ -20,7 +20,8 @@ def cartesian_2_spherical(cartesian_positions):
     """
     cartesian_positions = np.asarray(cartesian_positions)
     r = np.sum(cartesian_positions**2, axis=0)**0.5
-    theta = np.where(r == 0, 0, np.arccos(np.clip(cartesian_positions[2] / r, -1., 1.)))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        theta = np.where(r == 0, 0, np.arccos(np.clip(cartesian_positions[2] / r, -1., 1.)))
     phi = np.arctan2(cartesian_positions[1], cartesian_positions[0])
     return np.stack([r, theta, phi], axis=0)
 
@@ -53,10 +54,12 @@ def cartesian_2_trigonometric(cartesian_positions):
     """
     cartesian_positions = np.asarray(cartesian_positions)
     r = np.sum(cartesian_positions**2, axis=0)**0.5
-    normalized = np.where(r == 0, 0, cartesian_positions / r)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        normalized = np.where(r == 0, 0, cartesian_positions / r)
     cos_theta = np.clip(normalized[2], -1, 1)
     sin_theta = (1 - cos_theta**2)**0.5
-    xy_projected = np.where(sin_theta == 0, 0, normalized[:2] / sin_theta)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        xy_projected = np.where(sin_theta == 0, 0, normalized[:2] / sin_theta)
     cos_phi = np.clip(xy_projected[0], -1, 1)
     sin_phi = np.clip(xy_projected[1], -1, 1)
     return np.stack([r, cos_theta, sin_theta, cos_phi, sin_phi], axis=0)
