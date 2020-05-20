@@ -1,6 +1,7 @@
 """Implementations for indexing schemes of basic expansion coefficients or spherical basis functions."""
 
 import numpy as np
+import itertools
 
 
 def expansions(x, scheme, new=None):
@@ -51,25 +52,47 @@ def expansions(x, scheme, new=None):
     if type(x) is int:
         if new is None:
             return show_scheme(x, scheme)
-        if 'full' in scheme.lower() and 'compact' in new.lower():
-            return full_2_compact(x)
-        if 'full' in scheme.lower() and 'linear' in new.lower():
-            return full_2_linear(x)
-        if 'compact' in scheme.lower() and 'full' in new.lower():
-            raise ValueError('No simple indexing scheme possible to convert from compact to full')
-        if 'compact' in scheme.lower() and 'linear' in new.lower():
-            return compact_2_linear(x)
-        if 'linear' in scheme.lower() and 'compact' in new.lower():
-            return linear_2_compact(x)
-        if 'linear' in scheme.lower() and 'full' in new.lower():
-            raise ValueError('No simple indexing scheme possible to convert from compact to linear')
-        if scheme.lower() == new.lower():
-            if 'linear' in scheme.lower():
+        if 'full' in scheme.lower():
+            if 'full' in new.lower():
+                return slice(None), slice(None)
+            if 'compact' in new.lower():
+                return compact(x)
+            if 'linear' in new.lower():
+                return linear(x)
+            if 'sectorial' in new.lower():
+                if 'positive' in new.lower():
+                    return positive_sectorial(x)
+                if 'negative' in new.lower():
+                    return negative_sectorial(x)
+                return sectorial(x)
+            if 'tesseral' in new.lower():
+                if 'positive' in new.lower():
+                    return positive_tesseral(x)
+                if 'negative' in new.lower():
+                    return negative_tesseral(x)
+                return tesseral(x)
+            if 'zonal' in new.lower():
+                return zonal(x)
+            if 'nonnegative' in new.lower():
+                return nonnegative(x)
+            if 'nonpositive' in new.lower():
+                return nonpositive(x)
+            if 'positive' in new.lower():
+                return positive(x)
+            if 'negative' in new.lower():
+                return negative(x)
+        if 'compact' in scheme.lower():
+            if 'full' in new.lower():
+                raise ValueError('No simple indexing scheme possible to convert from compact to full')
+            if 'compact' in new.lower():
+                return slice(None), slice(None)
+            return compact_indices(*expansions(x, 'full', new))
+        if 'linear' in scheme.lower():
+            if 'full' in new.lower():
+                raise ValueError('No simple indexing scheme possible to convert from compact to linear')
+            if 'linear' in new.lower():
                 return slice(None)
-            if 'full' in scheme.lower():
-                return slice(None), slice(None)
-            if 'compact' in scheme.lower():
-                return slice(None), slice(None)
+            return linear_indices(*expansions(x, 'full', new))
     if 'full' in scheme.lower() and 'compact' in new.lower():
         return convert_full_2_compact(x)
     if 'full' in scheme.lower() and 'linear' in new.lower():
@@ -102,46 +125,125 @@ def show_scheme(order, form='full'):
     if 'full' in form.lower():
         return full
     if 'compact' in form.lower():
-        return full[full_2_compact(order)]
+        return full[compact(order)]
     if 'linear' in form.lower():
-        return full[full_2_linear(order)]
+        return full[linear(order)]
 
 
-def full_2_compact(order):
-    """Create indexing scheme from full form to compact form."""
+def full_indices(n, m):
+    """Find the indices of coefficients of order n and mode m in the "full" scheme."""
+    return n, m
+
+
+def compact_indices(n, m):
+    """Find the indices of coefficients of order n and mode m in the "compact" scheme."""
+    return np.where(m >= 0, n, - m - 1), np.where(m >= 0, m, n)
+
+
+def linear_indices(n, m):
+    """Find the indices of coefficients of order n and mode m in the "linear" scheme."""
+    return n**2 + n + m
+
+
+def compact(order):
+    """Create compact coefficient scheme."""
     return (
-        np.array([[row] * (row + 1) + list(range(row + 1, order + 1)) for row in range(order + 1)]),
-        np.array([list(range(row + 1)) + [-(row + 1)] * (order - row) for row in range(order + 1)])
+        np.array([[row] * (row + 1) + list(range(row + 1, order + 1)) for row in range(order + 1)], dtype=int),
+        np.array([list(range(row + 1)) + [-(row + 1)] * (order - row) for row in range(order + 1)], dtype=int)
     )
 
 
-def full_2_linear(order):
-    """Create indexing scheme from full form to linear form."""
+def linear(order):
+    """Create linear coefficient scheme."""
     return (
-        np.array([n for n in range(order + 1) for m in range(-n, n + 1)]),
-        np.array([m for n in range(order + 1) for m in range(-n, n + 1)])
+        np.array([n for n in range(order + 1) for m in range(-n, n + 1)], dtype=int),
+        np.array([m for n in range(order + 1) for m in range(-n, n + 1)], dtype=int)
     )
 
 
-def compact_2_linear(order):
-    """Create indexing scheme from compact form to linear form."""
+def positive(order):
+    """Create positive modes only linear coefficient scheme."""
     return (
-        np.array([n if m >= 0 else abs(m) - 1 for n in range(order + 1) for m in range(-n, n + 1)]),
-        np.array([m if m >= 0 else n for n in range(order + 1) for m in range(-n, n + 1)])
+        np.array([n for n in range(order + 1) for m in range(1, n + 1)], dtype=int),
+        np.array([m for n in range(order + 1) for m in range(1, n + 1)], dtype=int),
     )
 
 
-def linear_2_compact(order):
-    """Create indexing scheme from linear form to compact form."""
-    arr = np.zeros((order + 1, order + 1), dtype=int)
-    arr[compact_2_linear(order)] = np.arange((order + 1)**2)
-    return arr
+def negative(order):
+    """Create negative modes only linear coefficient scheme."""
+    return (
+        np.array([n for n in range(order + 1) for m in range(1, n + 1)], dtype=int),
+        np.array([-m for n in range(order + 1) for m in range(1, n + 1)], dtype=int),
+    )
+
+
+def nonnegative(order):
+    """Create non-negative modes only linear coefficient scheme."""
+    return (
+        np.array([n for n in range(order + 1) for m in range(n + 1)], dtype=int),
+        np.array([m for n in range(order + 1) for m in range(n + 1)], dtype=int),
+    )
+
+
+def nonpositive(order):
+    """Create non-positive modes only linear coefficient scheme."""
+    return (
+        np.array([n for n in range(order + 1) for m in range(n + 1)], dtype=int),
+        np.array([-m for n in range(order + 1) for m in range(n + 1)], dtype=int),
+    )
+
+
+def zonal(order):
+    """Create zonal modes only linear coefficient scheme."""
+    return (np.arange(order + 1), np.zeros(order + 1, int))
+
+
+def sectorial(order):
+    """Create sectorial modes only linear coefficient scheme."""
+    return (
+        np.array([n for n in range(order + 1) for m in [-n, n]], dtype=int),
+        np.array([m for n in range(order + 1) for m in [-n, n]], dtype=int),
+    )
+
+
+def positive_sectorial(order):
+    """Create positive sectorial modes only linear coefficient scheme."""
+    return (np.arange(1, order + 1, dtype=int), np.arange(1, order + 1, dtype=int))
+
+
+def negative_sectorial(order):
+    """Create negative sectorial modes only linear coefficient scheme."""
+    return (np.arange(1, order + 1, dtype=int), -np.arange(1, order + 1, dtype=int))
+
+
+def tesseral(order):
+    """Create tesseral modes only linear coefficient scheme."""
+    return (
+        np.array([n for n in range(order + 1) for m in itertools.chain(range(-n + 1, 0), range(1, n))], dtype=int),
+        np.array([m for n in range(order + 1) for m in itertools.chain(range(-n + 1, 0), range(1, n))], dtype=int)
+    )
+
+
+def positive_tesseral(order):
+    """Create positive tesseral modes only linear coefficient scheme."""
+    return (
+        np.array([n for n in range(order + 1) for m in range(1, n)], dtype=int),
+        np.array([m for n in range(order + 1) for m in range(1, n)], dtype=int)
+    )
+
+
+def negative_tesseral(order):
+    """Create negative tesseral modes only linear coefficient scheme."""
+    return (
+        np.array([n for n in range(order + 1) for m in range(1, n)], dtype=int),
+        np.array([-m for n in range(order + 1) for m in range(1, n)], dtype=int)
+    )
 
 
 def convert_full_2_compact(A):
     """Convert array from full form to compact form."""
     if 2 * A.shape[0] - 1 == A.shape[1]:
-        return A[full_2_compact(A.shape[0] - 1)]
+        return A[expansions(A.shape[0] - 1, 'full', 'compact')]
     else:
         raise ValueError(f"Cannot convert full form to compact with max order {A.shape[0] - 1} and max mode {(A.shape[1] - 1) // 2}")
 
@@ -149,7 +251,7 @@ def convert_full_2_compact(A):
 def convert_full_2_linear(A):
     """Convert array from full form to linear form."""
     if 2 * A.shape[0] - 1 == A.shape[1]:
-        return A[full_2_linear(A.shape[0] - 1)]
+        return A[expansions(A.shape[0] - 1, 'full', 'linear')]
     else:
         raise ValueError(f"Cannot convert full form to linear with max order {A.shape[0] - 1} and max mode {(A.shape[1] - 1) // 2}")
 
@@ -161,7 +263,7 @@ def convert_compact_2_full(A):
     if orders != modes:
         raise ValueError(f"Invalid compact form with max order {orders} and max mode {modes}")
     A_full = np.zeros((orders + 1, 2 * modes + 1), dtype=A.dtype)
-    A_full[full_2_compact(orders)] = A
+    A_full[expansions(orders, 'full', 'compact')] = A
     return A_full
 
 
@@ -171,7 +273,7 @@ def convert_compact_2_linear(A):
     modes = A.shape[0] - 1
     if orders != modes:
         raise ValueError(f"Invalid compact form with max order {orders} and max mode {modes}")
-    return A[compact_2_linear(orders)]
+    return A[expansions(orders, 'compact', 'linear')]
 
 
 def convert_linear_2_full(A):
@@ -181,7 +283,7 @@ def convert_linear_2_full(A):
     if (orders + 1) ** 2 != A.shape[0]:
         raise ValueError(f"Cannot convert linear form to full using {A.shape[0]} components")
     A_full = np.zeros((orders + 1, 2 * modes + 1), dtype=A.dtype)
-    A_full[full_2_linear(orders)] = A
+    A_full[expansions(orders, 'full', 'linear')] = A
     return A_full
 
 
@@ -190,4 +292,4 @@ def convert_linear_2_compact(A):
     orders = int(A.shape[0] ** 0.5) - 1
     if (orders + 1) ** 2 != A.shape[0]:
         raise ValueError(f"Cannot convert linear output to full using {A.shape[0]} components")
-    return A[linear_2_compact(orders)]
+    return A[expansions(orders, 'linear', 'compact')]
