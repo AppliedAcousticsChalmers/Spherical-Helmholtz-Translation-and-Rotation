@@ -302,7 +302,7 @@ def convert_compact_2_full(A):
     modes = A.shape[0] - 1
     if orders != modes:
         raise ValueError(f"Invalid compact form with max order {orders} and max mode {modes}")
-    A_full = np.zeros((orders + 1, 2 * modes + 1), dtype=A.dtype)
+    A_full = np.zeros((orders + 1, 2 * modes + 1) + A.shape[2:], dtype=A.dtype)
     A_full[expansions(orders, 'full', 'compact')] = A
     return A_full
 
@@ -322,7 +322,7 @@ def convert_linear_2_full(A):
     modes = orders
     if (orders + 1) ** 2 != A.shape[0]:
         raise ValueError(f"Cannot convert linear form to full using {A.shape[0]} components")
-    A_full = np.zeros((orders + 1, 2 * modes + 1), dtype=A.dtype)
+    A_full = np.zeros((orders + 1, 2 * modes + 1) + A.shape[1:], dtype=A.dtype)
     A_full[expansions(orders, 'full', 'linear')] = A
     return A_full
 

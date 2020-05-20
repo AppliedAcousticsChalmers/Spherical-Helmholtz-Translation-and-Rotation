@@ -45,39 +45,10 @@ def test_broadcasting(max_order, colatitude, azimuth):
 
 
 @pytest.mark.parametrize('max_order', [0, 1, 2, 6])
-def test_show_index_scheme(max_order):
-
-    full_idx = faheltzmm.generate._spherical_harmonics.show_index_scheme(max_order, return_negative_m='full')
-    compact_idx = faheltzmm.generate._spherical_harmonics.show_index_scheme(max_order, return_negative_m='compact')
-    positive_idx = faheltzmm.generate._spherical_harmonics.show_index_scheme(max_order, return_negative_m='positive')
-
-    for n in range(max_order + 1):
-        assert full_idx[n, 0] == (n, 0)
-        assert compact_idx[n, 0] == (n, 0)
-        assert positive_idx[n, 0] == (n, 0)
-        for m in range(1, n + 1):
-            assert full_idx[n, m] == (n, m)
-            assert full_idx[n, -m] == (n, -m)
-            assert compact_idx[n, m] == (n, m)
-            assert compact_idx[m - 1, n] == (n, -m)
-            assert positive_idx[n, m] == (n, m)
-
-    for n in range(max_order + 1):
-        for m in range(n + 1, max_order + 1):
-            assert positive_idx[n, m] is None
-
-
-@pytest.mark.parametrize('max_order', [0, 1, 2, 6])
 @pytest.mark.parametrize('colatitude, azimuth', [(0.5, 0.5)] + same_dimension_angles)
 def test_positive_output_format(max_order, colatitude, azimuth):
     positive = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=False)
     full = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True)
-
-    positive_to_full = faheltzmm.generate._spherical_harmonics.positive_to_full(positive)
-    full_to_positive = faheltzmm.generate._spherical_harmonics.full_to_positive(full)
-
-    np.testing.assert_allclose(full, positive_to_full)
-    np.testing.assert_allclose(positive, full_to_positive)
 
     for n in range(max_order + 1):
         np.testing.assert_allclose(positive[n, 0], full[n, 0], err_msg="Positive output does not equal full output at (n, m) = ({}, 0)".format(n))
@@ -89,11 +60,11 @@ def test_positive_output_format(max_order, colatitude, azimuth):
 @pytest.mark.parametrize('max_order', [0, 1, 2, 6])
 @pytest.mark.parametrize('colatitude, azimuth', [(0.5, 0.5)] + same_dimension_angles)
 def test_compact_output_format(max_order, colatitude, azimuth):
-    full = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True)
-    compact = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m='compact')
+    full = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True, indexing_scheme='full')
+    compact = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True, indexing_scheme='compact')
 
-    full_to_compact = faheltzmm.generate._spherical_harmonics.full_to_compact(full)
-    compact_to_full = faheltzmm.generate._spherical_harmonics.compact_to_full(compact)
+    full_to_compact = faheltzmm.indexing.expansions(full, 'full', 'compact')
+    compact_to_full = faheltzmm.indexing.expansions(compact, 'compact', 'full')
 
     np.testing.assert_allclose(full, compact_to_full)
     np.testing.assert_allclose(compact, full_to_compact)
@@ -103,3 +74,21 @@ def test_compact_output_format(max_order, colatitude, azimuth):
         for m in range(1, n + 1):
             np.testing.assert_allclose(compact[n, m], full[n, m], err_msg="Compact output does not equal full output at (n,m) = ({}, {})".format(n, m))
             np.testing.assert_allclose(compact[m - 1, n], full[n, -m], err_msg="Compact output does not equal full output at (n,m) = ({}, {})".format(n, -m))
+
+
+@pytest.mark.parametrize('max_order', [0, 1, 2, 6])
+@pytest.mark.parametrize('colatitude, azimuth', [(0.5, 0.5)] + same_dimension_angles)
+def test_linear_output_format(max_order, colatitude, azimuth):
+    full = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True, indexing_scheme='full')
+    linear = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True, indexing_scheme='linear')
+
+    full_to_linear = faheltzmm.indexing.expansions(full, 'full', 'linear')
+    linear_to_full = faheltzmm.indexing.expansions(linear, 'linear', 'full')
+    np.testing.assert_allclose(full, linear_to_full)
+    np.testing.assert_allclose(linear, full_to_linear)
+
+    idx = 0
+    for n in range(max_order + 1):
+        for m in range(-n, n + 1):
+            np.testing.assert_allclose(linear[idx], full[n, m], err_msg=f"Linear output does not equal full output at (n,m) = ({n}, {m})")
+            idx += 1
