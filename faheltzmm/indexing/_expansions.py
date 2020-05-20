@@ -17,12 +17,12 @@ def expansions(x, scheme, new=None):
         The input ndarray fill be converted from the `original` indexing scheme
         to the `new` indexing scheme.
         In the "convert" mode, both `scheme` and `new` has to be given,
-        and both have to be one of "full", 'compact" or "linear".
+        and both have to be one of "natural", 'compact" or "linear".
     - Indices
         This is used when the first argument is an integer, and the other two arguments are strings with schemes.
         The output will be two nested lists, (n, m) which can be sed to index an array of the `scheme` scheme
-        to convert it to the `new` scheme. Note that this simple indexing convertion cannot convert to the full scheme.
-        In this mode, `scheme` has to be one of "full", "compact" or "linear", while "new" can be one of the subset schemes.
+        to convert it to the `new` scheme. Note that this simple indexing convertion cannot convert to the natural scheme.
+        In this mode, `scheme` has to be one of "natural", "compact" or "linear", while "new" can be one of the subset schemes.
     - Display
         This mode is activated by passing an order as the first argument, a scheme as the second argument,
         and no third argument. The output will be an ndarray with tuples (n,m) showing
@@ -32,7 +32,7 @@ def expansions(x, scheme, new=None):
     -----------------
     In the following description [..] is used to indicate indexing of an ndarray, and (n,m)
     denotes the order n and mode m ot a coefficient or spherical basis.
-    - Full
+    - Natural
         This scheme is indexed with [n,m] -> (n,m) for all indices.
         This relies on python reverse indexing for m<0, i.e. [n,-|m|] -> (n,m) for m<0.
         Uses a (N+1, 2N+1) matrix to store the (N+1)^2 values, i.e the sparsity goes to 50%.
@@ -41,6 +41,8 @@ def expansions(x, scheme, new=None):
         of the array, i.e. [n,m] -> (n,m) for m>=0.
         The negative coefficients for a given order are stored in a single column,
         i.e. [n,m] -> (m,-n-1) for m>n, or [-m-1, n] -> (n,m) for m<0.
+    - Natural (or compact) nonnegative (or positive)
+        The same as natural and compact, but only for m>= 0
     - Linear
         This scheme stores the coefficients in a 1D array of length (N+1)^2,
         which is indexed as [n^2 + n + m] -> (n,m) or [idx] -> (n=floor(sqrt(idx)), m=idx - n^2 - n).
@@ -83,8 +85,11 @@ def expansions(x, scheme, new=None):
     if type(x) is int:
         if new is None:
             return show_scheme(x, scheme)
-        if 'full' in scheme.lower():
-            if 'full' in new.lower():
+        if 'natural' in scheme.lower():
+            if 'natural' in new.lower():
+                if 'positive' in new.lower() or 'nonnegative' in new.lower():
+                    return np.arange(x + 1)[:, None], np.arange(x + 1)[None, :]
+                return np.arange(x + 1)[:, None], np.concatenate([np.arange(x + 1), np.arange(-x, 0)])[None, :]
                 return slice(None), slice(None)
             if 'compact' in new.lower():
                 return compact(x)
@@ -113,53 +118,54 @@ def expansions(x, scheme, new=None):
                     return nonnegative(x)
                 return negative(x)
         if 'compact' in scheme.lower():
-            if 'full' in new.lower():
-                raise ValueError('No simple indexing scheme possible to convert from compact to full')
-            if 'compact' in new.lower():
-                return slice(None), slice(None)
-            return compact_indices(*expansions(x, 'full', new))
+            if 'natural' in new.lower():
+                raise ValueError('No simple indexing scheme possible to convert from compact to natural')
+            # if 'compact' in new.lower():
+                # return np.arange(x + 1)[:, None], np.arange(x + 1)[None, :]
+                # return slice(None), slice(None)
+            return compact_indices(*expansions(x, 'natural', new))
         if 'linear' in scheme.lower():
-            if 'full' in new.lower():
-                raise ValueError('No simple indexing scheme possible to convert from compact to linear')
-            if 'linear' in new.lower():
-                return slice(None)
-            return linear_indices(*expansions(x, 'full', new))
-    if 'full' in scheme.lower() and 'compact' in new.lower():
-        return convert_full_2_compact(x)
-    if 'full' in scheme.lower() and 'linear' in new.lower():
-        return convert_full_2_linear(x)
-    if 'compact' in scheme.lower() and 'full' in new.lower():
-        return convert_compact_2_full(x)
+            if 'natural' in new.lower():
+                raise ValueError('No simple indexing scheme possible to convert from linear to natural')
+            # if 'linear' in new.lower():
+                # return slice(None)
+            return linear_indices(*expansions(x, 'natural', new))
+    if 'natural' in scheme.lower() and 'compact' in new.lower():
+        return convert_natural_2_compact(x)
+    if 'natural' in scheme.lower() and 'linear' in new.lower():
+        return convert_natural_2_linear(x)
+    if 'compact' in scheme.lower() and 'natural' in new.lower():
+        return convert_compact_2_natural(x)
     if 'compact' in scheme.lower() and 'linear' in new.lower():
         return convert_compact_2_linear(x)
     if 'linear' in scheme.lower() and 'compact' in new.lower():
         return convert_linear_2_compact(x)
-    if 'linear' in scheme.lower() and 'full' in new.lower():
-        return convert_linear_2_full(x)
+    if 'linear' in scheme.lower() and 'natural' in new.lower():
+        return convert_linear_2_natural(x)
     if scheme.lower() == new.lower():
         return x
     raise ValueError(f'Unknown indexing schemes, {scheme} and {new}')
 
 
-def show_scheme(order, form='full'):
+def show_scheme(order, form='natural'):
     """Show an indexing form.
 
     Creates a numpy array with tuples (n, m) to show how the expansion coefficients
     are organized for a specific scheme.
     """
-    full = np.full((order + 1, 2 * order + 1), None, object)
+    natural = np.full((order + 1, 2 * order + 1), None, object)
     for n in range(order + 1):
-        full[n, 0] = (n, 0)
+        natural[n, 0] = (n, 0)
         for m in range(1, n + 1):
-            full[n, m] = (n, m)
-            full[n, -m] = (n, -m)
-    return full[expansions(order, 'full', form)]
+            natural[n, m] = (n, m)
+            natural[n, -m] = (n, -m)
+    return natural[expansions(order, 'natural', form)]
 
 
-def full_indices(n, m):
-    """Find the indices of coefficients of order n and mode m in the "full" scheme.
+def natural_indices(n, m):
+    """Find the indices of coefficients of order n and mode m in the "natural" scheme.
 
-    The full scheme is indexed using [n,m] for all n and m.
+    The natural scheme is indexed using [n,m] for all n and m.
     This relies on reverse indexing in python and assumes that the array is
     large enough so that there is no overlap between the positive and negative modes.
     """
@@ -280,31 +286,31 @@ def negative_tesseral(order):
     )
 
 
-def convert_full_2_compact(A):
-    """Convert array from full form to compact form."""
+def convert_natural_2_compact(A):
+    """Convert array from natural form to compact form."""
     if 2 * A.shape[0] - 1 == A.shape[1]:
-        return A[expansions(A.shape[0] - 1, 'full', 'compact')]
+        return A[expansions(A.shape[0] - 1, 'natural', 'compact')]
     else:
-        raise ValueError(f"Cannot convert full form to compact with max order {A.shape[0] - 1} and max mode {(A.shape[1] - 1) // 2}")
+        raise ValueError(f"Cannot convert natural form to compact with max order {A.shape[0] - 1} and max mode {(A.shape[1] - 1) // 2}")
 
 
-def convert_full_2_linear(A):
-    """Convert array from full form to linear form."""
+def convert_natural_2_linear(A):
+    """Convert array from natural form to linear form."""
     if 2 * A.shape[0] - 1 == A.shape[1]:
-        return A[expansions(A.shape[0] - 1, 'full', 'linear')]
+        return A[expansions(A.shape[0] - 1, 'natural', 'linear')]
     else:
-        raise ValueError(f"Cannot convert full form to linear with max order {A.shape[0] - 1} and max mode {(A.shape[1] - 1) // 2}")
+        raise ValueError(f"Cannot convert natural form to linear with max order {A.shape[0] - 1} and max mode {(A.shape[1] - 1) // 2}")
 
 
-def convert_compact_2_full(A):
-    """Convert array from compact form to full form."""
+def convert_compact_2_natural(A):
+    """Convert array from compact form to natural form."""
     orders = A.shape[0] - 1
     modes = A.shape[0] - 1
     if orders != modes:
         raise ValueError(f"Invalid compact form with max order {orders} and max mode {modes}")
-    A_full = np.zeros((orders + 1, 2 * modes + 1) + A.shape[2:], dtype=A.dtype)
-    A_full[expansions(orders, 'full', 'compact')] = A
-    return A_full
+    A_natural = np.zeros((orders + 1, 2 * modes + 1) + A.shape[2:], dtype=A.dtype)
+    A_natural[expansions(orders, 'natural', 'compact')] = A
+    return A_natural
 
 
 def convert_compact_2_linear(A):
@@ -316,20 +322,20 @@ def convert_compact_2_linear(A):
     return A[expansions(orders, 'compact', 'linear')]
 
 
-def convert_linear_2_full(A):
-    """Convert array from linear form to full form."""
+def convert_linear_2_natural(A):
+    """Convert array from linear form to natural form."""
     orders = int(A.shape[0] ** 0.5) - 1
     modes = orders
     if (orders + 1) ** 2 != A.shape[0]:
-        raise ValueError(f"Cannot convert linear form to full using {A.shape[0]} components")
-    A_full = np.zeros((orders + 1, 2 * modes + 1) + A.shape[1:], dtype=A.dtype)
-    A_full[expansions(orders, 'full', 'linear')] = A
-    return A_full
+        raise ValueError(f"Cannot convert linear form to natural using {A.shape[0]} components")
+    A_natural = np.zeros((orders + 1, 2 * modes + 1) + A.shape[1:], dtype=A.dtype)
+    A_natural[expansions(orders, 'natural', 'linear')] = A
+    return A_natural
 
 
 def convert_linear_2_compact(A):
     """Convert array from linear form to compact form."""
     orders = int(A.shape[0] ** 0.5) - 1
     if (orders + 1) ** 2 != A.shape[0]:
-        raise ValueError(f"Cannot convert linear output to full using {A.shape[0]} components")
+        raise ValueError(f"Cannot convert linear output to natural using {A.shape[0]} components")
     return A[expansions(orders, 'linear', 'compact')]

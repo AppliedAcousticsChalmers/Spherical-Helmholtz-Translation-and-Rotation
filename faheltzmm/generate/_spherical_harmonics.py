@@ -5,7 +5,7 @@ from ._legendre import legendre_all
 from .. import indexing
 
 
-def spherical_harmonics_all(max_order, colatitude=None, azimuth=None, cosine_colatitude=None, return_negative_m=True, indexing_scheme='full'):
+def spherical_harmonics_all(max_order, colatitude=None, azimuth=None, cosine_colatitude=None, return_negative_m=True, indexing_scheme='natural'):
     cosine_colatitude = cosine_colatitude if cosine_colatitude is not None else np.cos(colatitude)
     azimuth = azimuth if np.iscomplexobj(azimuth) else np.exp(1j * azimuth)
     angles = np.broadcast(cosine_colatitude, azimuth)
@@ -16,13 +16,13 @@ def spherical_harmonics_all(max_order, colatitude=None, azimuth=None, cosine_col
     if return_negative_m:
         harmonics = np.zeros((max_order + 1, 2 * max_order + 1) + angles.shape, dtype=complex)
         harmonics[:, :max_order + 1] = legendre_values * azimuth
-        negative_indices = indexing.expansions(max_order, 'full', 'negative')
-        positive_indices = indexing.expansions(max_order, 'full', 'positive')
+        negative_indices = indexing.expansions(max_order, 'natural', 'negative')
+        positive_indices = indexing.expansions(max_order, 'natural', 'positive')
         minus_one_to_m = (-1) ** positive_indices[1].reshape([-1] + [1] * (angles.ndim))
         harmonics[negative_indices] = harmonics[positive_indices].conj() * minus_one_to_m
-        harmonics = indexing.expansions(harmonics, 'full', indexing_scheme)
+        harmonics = indexing.expansions(harmonics, 'natural', indexing_scheme)
     else:
         harmonics = legendre_values * azimuth
         if 'linear' in indexing_scheme.lower():
-            harmonics = indexing.expansions(harmonics, 'full', 'positive')
+            harmonics = harmonics[indexing.expansions(max_order, 'natural', 'positive')]
     return harmonics * (2 * np.pi)**-0.5
