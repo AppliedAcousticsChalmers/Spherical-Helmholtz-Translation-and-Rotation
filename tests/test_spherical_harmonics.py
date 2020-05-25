@@ -31,7 +31,7 @@ def test_scipy_conformity(max_order, colatitude, azimuth):
     pos_m = np.arange(max_order + 1).reshape([1, -1] + [1] * angles.ndim)
     all_m = np.concatenate([pos_m, -pos_m[:, :0:-1]], axis=1)
     scipy_all_m = np.nan_to_num(scipy.special.sph_harm(all_m, all_n, azimuth, colatitude))
-    implemented_all_m = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True)
+    implemented_all_m = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, indexing_scheme='natural')
 
     np.testing.assert_allclose(implemented_all_m, scipy_all_m, atol=1e-15)
 
@@ -39,7 +39,7 @@ def test_scipy_conformity(max_order, colatitude, azimuth):
 @pytest.mark.parametrize('max_order', [0, 1, 2, 3])
 @pytest.mark.parametrize('colatitude, azimuth', same_dimension_angles + broadcasting_angles)
 def test_broadcasting(max_order, colatitude, azimuth):
-    implemented = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=False).shape
+    implemented = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, indexing_scheme='natural non-negative').shape
     expected = (max_order + 1, max_order + 1) + np.broadcast(colatitude, azimuth).shape
     assert implemented == expected, "Broadcasted array has unexpected shape. Got {}, expected {}".format(implemented, expected)
 
@@ -47,8 +47,8 @@ def test_broadcasting(max_order, colatitude, azimuth):
 @pytest.mark.parametrize('max_order', [0, 1, 2, 6])
 @pytest.mark.parametrize('colatitude, azimuth', [(0.5, 0.5)] + same_dimension_angles)
 def test_positive_output_format(max_order, colatitude, azimuth):
-    positive = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=False)
-    natural = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True)
+    positive = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, indexing_scheme='natural non-negative')
+    natural = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, indexing_scheme='natural')
 
     for n in range(max_order + 1):
         np.testing.assert_allclose(positive[n, 0], natural[n, 0], err_msg="Positive output does not equal natural output at (n, m) = ({}, 0)".format(n))
@@ -60,8 +60,8 @@ def test_positive_output_format(max_order, colatitude, azimuth):
 @pytest.mark.parametrize('max_order', [0, 1, 2, 6])
 @pytest.mark.parametrize('colatitude, azimuth', [(0.5, 0.5)] + same_dimension_angles)
 def test_compact_output_format(max_order, colatitude, azimuth):
-    natural = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True, indexing_scheme='natural')
-    compact = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True, indexing_scheme='compact')
+    natural = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, indexing_scheme='natural')
+    compact = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, indexing_scheme='compact')
 
     natural_to_compact = faheltzmm.indexing.expansions(natural, 'natural', 'compact')
     compact_to_natural = faheltzmm.indexing.expansions(compact, 'compact', 'natural')
@@ -79,8 +79,8 @@ def test_compact_output_format(max_order, colatitude, azimuth):
 @pytest.mark.parametrize('max_order', [0, 1, 2, 6])
 @pytest.mark.parametrize('colatitude, azimuth', [(0.5, 0.5)] + same_dimension_angles)
 def test_linear_output_format(max_order, colatitude, azimuth):
-    natural = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True, indexing_scheme='natural')
-    linear = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, return_negative_m=True, indexing_scheme='linear')
+    natural = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, indexing_scheme='natural')
+    linear = faheltzmm.generate._spherical_harmonics.spherical_harmonics_all(max_order, colatitude, azimuth, indexing_scheme='linear')
 
     natural_to_linear = faheltzmm.indexing.expansions(natural, 'natural', 'linear')
     linear_to_natural = faheltzmm.indexing.expansions(linear, 'linear', 'natural')

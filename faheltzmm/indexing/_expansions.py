@@ -41,7 +41,7 @@ def expansions(x, scheme, new=None):
         of the array, i.e. [n,m] -> (n,m) for m>=0.
         The negative coefficients for a given order are stored in a single column,
         i.e. [n,m] -> (m,-n-1) for m>n, or [-m-1, n] -> (n,m) for m<0.
-    - Natural (or compact) nonnegative (or positive)
+    - Natural (or compact) nonnegative
         The same as natural and compact, but only for m>= 0
     - Linear
         This scheme stores the coefficients in a 1D array of length (N+1)^2,
@@ -87,14 +87,13 @@ def expansions(x, scheme, new=None):
             return show_scheme(x, scheme)
         if 'natural' in scheme.lower():
             if 'natural' in new.lower():
-                if 'positive' in new.lower() or 'nonnegative' in new.lower():
+                if 'non' in new.lower() and 'negative' in new.lower():
                     return np.arange(x + 1)[:, None], np.arange(x + 1)[None, :]
                 return np.arange(x + 1)[:, None], np.concatenate([np.arange(x + 1), np.arange(-x, 0)])[None, :]
-                return slice(None), slice(None)
             if 'compact' in new.lower():
+                if 'non' in new.lower() and 'negative' in new.lower():
+                    return np.arange(x + 1)[:, None], np.arange(x + 1)[None, :]
                 return compact(x)
-            if 'linear' in new.lower():
-                return linear(x)
             if 'sectorial' in new.lower():
                 if 'positive' in new.lower():
                     return positive_sectorial(x)
@@ -117,31 +116,37 @@ def expansions(x, scheme, new=None):
                 if 'non' in new.lower():
                     return nonnegative(x)
                 return negative(x)
+            if 'linear' in new.lower():
+                # By checking linear last it is allowed to include "linear" in all other forms,
+                # e.g. "linear positive" and "positive" will mean the same thing.
+                return linear(x)
         if 'compact' in scheme.lower():
             if 'natural' in new.lower():
                 raise ValueError('No simple indexing scheme possible to convert from compact to natural')
-            # if 'compact' in new.lower():
-                # return np.arange(x + 1)[:, None], np.arange(x + 1)[None, :]
-                # return slice(None), slice(None)
             return compact_indices(*expansions(x, 'natural', new))
         if 'linear' in scheme.lower():
             if 'natural' in new.lower():
                 raise ValueError('No simple indexing scheme possible to convert from linear to natural')
-            # if 'linear' in new.lower():
-                # return slice(None)
             return linear_indices(*expansions(x, 'natural', new))
-    if 'natural' in scheme.lower() and 'compact' in new.lower():
-        return convert_natural_2_compact(x)
-    if 'natural' in scheme.lower() and 'linear' in new.lower():
-        return convert_natural_2_linear(x)
-    if 'compact' in scheme.lower() and 'natural' in new.lower():
-        return convert_compact_2_natural(x)
-    if 'compact' in scheme.lower() and 'linear' in new.lower():
-        return convert_compact_2_linear(x)
-    if 'linear' in scheme.lower() and 'compact' in new.lower():
-        return convert_linear_2_compact(x)
-    if 'linear' in scheme.lower() and 'natural' in new.lower():
-        return convert_linear_2_natural(x)
+
+    if 'natural' == scheme.lower():
+        return x[expansions(x.shape[0] - 1, 'natural', new)]
+    if 'compact' == scheme.lower():
+        orders = x.shape[0] - 1
+        if 'natural' == new.lower():
+            natural = np.zeros((orders + 1, 2 * orders + 1) + x.shape[2:], dtype=x.dtype)
+            natural[expansions(orders, 'natural', 'compact')] = x
+            return natural
+        return x[expansions(orders, 'compact', new)]
+    if 'linear' == scheme.lower():
+        orders = np.math.floor(x.shape[0]**0.5) - 1
+        assert (orders + 1)**2 == x.shape[0], f'Array with {x.shape[0]} elements cannot be using linear scheme!'
+        if 'natural' == new.lower():
+            natural = np.zeros((orders + 1, 2 * orders + 1) + x.shape[1:], dtype=x.dtype)
+            natural[expansions(orders, 'natural', 'linear')] = x
+            return natural
+        return x[expansions(orders, 'linear', new)]
+
     if scheme.lower() == new.lower():
         return x
     raise ValueError(f'Unknown indexing schemes, {scheme} and {new}')
@@ -284,58 +289,3 @@ def negative_tesseral(order):
         np.array([n for n in range(order + 1) for m in range(1, n)], dtype=int),
         np.array([-m for n in range(order + 1) for m in range(1, n)], dtype=int)
     )
-
-
-def convert_natural_2_compact(A):
-    """Convert array from natural form to compact form."""
-    if 2 * A.shape[0] - 1 == A.shape[1]:
-        return A[expansions(A.shape[0] - 1, 'natural', 'compact')]
-    else:
-        raise ValueError(f"Cannot convert natural form to compact with max order {A.shape[0] - 1} and max mode {(A.shape[1] - 1) // 2}")
-
-
-def convert_natural_2_linear(A):
-    """Convert array from natural form to linear form."""
-    if 2 * A.shape[0] - 1 == A.shape[1]:
-        return A[expansions(A.shape[0] - 1, 'natural', 'linear')]
-    else:
-        raise ValueError(f"Cannot convert natural form to linear with max order {A.shape[0] - 1} and max mode {(A.shape[1] - 1) // 2}")
-
-
-def convert_compact_2_natural(A):
-    """Convert array from compact form to natural form."""
-    orders = A.shape[0] - 1
-    modes = A.shape[0] - 1
-    if orders != modes:
-        raise ValueError(f"Invalid compact form with max order {orders} and max mode {modes}")
-    A_natural = np.zeros((orders + 1, 2 * modes + 1) + A.shape[2:], dtype=A.dtype)
-    A_natural[expansions(orders, 'natural', 'compact')] = A
-    return A_natural
-
-
-def convert_compact_2_linear(A):
-    """Convert array from compact form to linear form."""
-    orders = A.shape[0] - 1
-    modes = A.shape[0] - 1
-    if orders != modes:
-        raise ValueError(f"Invalid compact form with max order {orders} and max mode {modes}")
-    return A[expansions(orders, 'compact', 'linear')]
-
-
-def convert_linear_2_natural(A):
-    """Convert array from linear form to natural form."""
-    orders = int(A.shape[0] ** 0.5) - 1
-    modes = orders
-    if (orders + 1) ** 2 != A.shape[0]:
-        raise ValueError(f"Cannot convert linear form to natural using {A.shape[0]} components")
-    A_natural = np.zeros((orders + 1, 2 * modes + 1) + A.shape[1:], dtype=A.dtype)
-    A_natural[expansions(orders, 'natural', 'linear')] = A
-    return A_natural
-
-
-def convert_linear_2_compact(A):
-    """Convert array from linear form to compact form."""
-    orders = int(A.shape[0] ** 0.5) - 1
-    if (orders + 1) ** 2 != A.shape[0]:
-        raise ValueError(f"Cannot convert linear output to natural using {A.shape[0]} components")
-    return A[expansions(orders, 'linear', 'compact')]
