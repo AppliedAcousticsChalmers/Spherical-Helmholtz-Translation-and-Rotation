@@ -143,6 +143,28 @@ def test_negative_sectorial_indices(order, scheme):
 
 @pytest.mark.parametrize('scheme', ['natural', 'compact', 'linear'])
 @pytest.mark.parametrize('order', [0, 1, 4])
+def test_nonpositive_sectorial_indices(order, scheme):
+    all_components = faheltzmm.indexing.expansions(order, scheme)
+    nonpositive_sectorial_components = all_components[faheltzmm.indexing.expansions(order, scheme, 'non-positive sectorial')]
+    idx = 0
+    for n in range(order + 1):
+        assert nonpositive_sectorial_components[idx] == (n, -n), f'Failed non-positive sectorial components modes extraction for scheme {scheme} at order {order}, expected {(n, n)}, got {positive_sectorial_components[idx]}'
+        idx += 1
+
+
+@pytest.mark.parametrize('scheme', ['natural', 'compact', 'linear'])
+@pytest.mark.parametrize('order', [0, 1, 4])
+def test_nonnegative_sectorial_indices(order, scheme):
+    all_components = faheltzmm.indexing.expansions(order, scheme)
+    nonnegative_sectorial_components = all_components[faheltzmm.indexing.expansions(order, scheme, 'non-negative sectorial')]
+    idx = 0
+    for n in range(order + 1):
+        assert nonnegative_sectorial_components[idx] == (n, n), f'Failed non-negative sectorial components modes extraction for scheme {scheme} at order {order}, expected {(n, -n)}, got {negative_sectorial_components[idx]}'
+        idx += 1
+
+
+@pytest.mark.parametrize('scheme', ['natural', 'compact', 'linear'])
+@pytest.mark.parametrize('order', [0, 1, 4])
 def test_tesseral_indices(order, scheme):
     all_components = faheltzmm.indexing.expansions(order, scheme)
     tesseral_components = all_components[faheltzmm.indexing.expansions(order, scheme, 'tesseral')]

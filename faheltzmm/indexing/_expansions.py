@@ -62,6 +62,10 @@ def expansions(x, scheme, new=None):
         This includes coefficients where n=m>0, stored as [(1,1),(2,2),(3,3)...
     - Negative sectorial
         This includes coefficients where n=-m>0, stored as [(1,-1),(2,-2),(3,-3)...
+    - Non-negative sectorial
+        This includes coefficients where n=m>=0, stored as [(0,0),(1,1),(2,2),(3,3)...
+    - Non-positive sectorial
+        This includes coefficients where n=-m>=0, stored as [(0,0),(1,-1),(2,-2),(3,-3)...
     - Tesseral
         This includes coefficients where 0<|m|<n, stored as [(2,-1),(2,1),(3,-2),(3,-1),(3,1),(3,2)...
     - Positive tesseral
@@ -95,6 +99,11 @@ def expansions(x, scheme, new=None):
                     return np.arange(x + 1)[:, None], np.arange(x + 1)[None, :]
                 return compact(x)
             if 'sectorial' in new.lower():
+                if 'non' in new.lower():
+                    if 'positive' in new.lower():
+                        return nonpositive_sectorial(x)
+                    if 'negative' in new.lower():
+                        return nonnegative_sectorial(x)
                 if 'positive' in new.lower():
                     return positive_sectorial(x)
                 if 'negative' in new.lower():
@@ -128,27 +137,27 @@ def expansions(x, scheme, new=None):
             if 'natural' in new.lower():
                 raise ValueError('No simple indexing scheme possible to convert from linear to natural')
             return linear_indices(*expansions(x, 'natural', new))
+    else:
+        if 'natural' == scheme.lower():
+            return x[expansions(x.shape[0] - 1, 'natural', new)]
+        if 'compact' == scheme.lower():
+            orders = x.shape[0] - 1
+            if 'natural' == new.lower():
+                natural = np.zeros((orders + 1, 2 * orders + 1) + x.shape[2:], dtype=x.dtype)
+                natural[expansions(orders, 'natural', 'compact')] = x
+                return natural
+            return x[expansions(orders, 'compact', new)]
+        if 'linear' == scheme.lower():
+            orders = np.math.floor(x.shape[0]**0.5) - 1
+            assert (orders + 1)**2 == x.shape[0], f'Array with {x.shape[0]} elements cannot be using linear scheme!'
+            if 'natural' == new.lower():
+                natural = np.zeros((orders + 1, 2 * orders + 1) + x.shape[1:], dtype=x.dtype)
+                natural[expansions(orders, 'natural', 'linear')] = x
+                return natural
+            return x[expansions(orders, 'linear', new)]
 
-    if 'natural' == scheme.lower():
-        return x[expansions(x.shape[0] - 1, 'natural', new)]
-    if 'compact' == scheme.lower():
-        orders = x.shape[0] - 1
-        if 'natural' == new.lower():
-            natural = np.zeros((orders + 1, 2 * orders + 1) + x.shape[2:], dtype=x.dtype)
-            natural[expansions(orders, 'natural', 'compact')] = x
-            return natural
-        return x[expansions(orders, 'compact', new)]
-    if 'linear' == scheme.lower():
-        orders = np.math.floor(x.shape[0]**0.5) - 1
-        assert (orders + 1)**2 == x.shape[0], f'Array with {x.shape[0]} elements cannot be using linear scheme!'
-        if 'natural' == new.lower():
-            natural = np.zeros((orders + 1, 2 * orders + 1) + x.shape[1:], dtype=x.dtype)
-            natural[expansions(orders, 'natural', 'linear')] = x
-            return natural
-        return x[expansions(orders, 'linear', new)]
-
-    if scheme.lower() == new.lower():
-        return x
+        if scheme.lower() == new.lower():
+            return x
     raise ValueError(f'Unknown indexing schemes, {scheme} and {new}')
 
 
@@ -265,6 +274,16 @@ def positive_sectorial(order):
 def negative_sectorial(order):
     """Create negative sectorial modes only linear coefficient scheme."""
     return (np.arange(1, order + 1, dtype=int), -np.arange(1, order + 1, dtype=int))
+
+
+def nonpositive_sectorial(order):
+    """Create positive sectorial modes only linear coefficient scheme."""
+    return (np.arange(order + 1, dtype=int), -np.arange(order + 1, dtype=int))
+
+
+def nonnegative_sectorial(order):
+    """Create negative sectorial modes only linear coefficient scheme."""
+    return (np.arange(order + 1, dtype=int), np.arange(order + 1, dtype=int))
 
 
 def tesseral(order):
