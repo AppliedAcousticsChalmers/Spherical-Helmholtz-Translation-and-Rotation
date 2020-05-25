@@ -15,16 +15,31 @@ from scipy.special import spherical_jn, spherical_yn
 
 
 def spherical_hn(n, z, derivative=False):
+    """Calculate the spherical Hankel function.
+
+    This is a convenience function to calculate
+
+    .. math::
+
+        h_n(z) = j_n(z) + j y_n(z)
+
+    using the scipy implementations of the above.
+    Parameters and outputs as `scipy.special.spherical_jn`, and `scipy.special.spherical_yn`,
+    which can be accessed as `spherical_jn`, and `spherical_yn` from this module.
+    """
     return spherical_jn(n, z, derivative=derivative) + 1j * spherical_yn(n, z, derivative=derivative)
 
 
 def spherical_jn_all(max_order, z, derivative=False):
+    """Calculate all spherical Bessel functions up tp a given maximum order."""
     return spherical_jn(np.arange(max_order + 1).reshape([-1] + [1] * np.ndim(z)), z, derivative=derivative)
 
 
 def spherical_yn_all(max_order, z, derivative=False):
+    """Calculate all spherical Neumann functions up tp a given maximum order."""
     return spherical_yn(np.arange(max_order + 1).reshape([-1] + [1] * np.ndim(z)), z, derivative=derivative)
 
 
 def spherical_hn_all(max_order, z, derivative=False):
+    """Calculate all spherical Hankel functions up tp a given maximum order."""
     return spherical_hn(np.arange(max_order + 1).reshape([-1] + [1] * np.ndim(z)), z, derivative=derivative)

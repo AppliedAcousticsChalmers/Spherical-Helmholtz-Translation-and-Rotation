@@ -8,6 +8,45 @@ from .. import indexing
 
 
 def spherical_base_all(max_order, position, wavenumber, domain, indexing_scheme='natural'):
+    r"""Calculate all spherical basis functions up to a given max order.
+
+    This calculates the regular :math:`(R_n^m)` and/or singular :math:`(S_n^m)`spherical basis functions,
+    defined as
+
+    .. math::
+
+        R_n^m(\vec r) = j_n(kr) Y_n^m(\theta, \phi)
+        S_n^m(\vec r) = h_n(kr) Y_n^m(\theta, \phi)
+
+    at the cartesian positions `position`, for the wavenumbers in `waveumber`, up to and including order `n <= max_order`.
+    Selection of the regular basis function is done using `domain='regular'` or `domain='interior'`, and selection
+    of the singular basis function is done using `domain='singular'` or `domain='exterior'`.
+    Simultaneous calculation of both can be done using `domain='both'` or `domain='all'`,
+    in which case the output is `(regular, singular).
+
+    Parameters
+    ----------
+    max_order : int
+        The maximum order to calculate, inclusive.
+    position : ndarray
+        The cartesian positions at which to calculate. The first axis corresponds to x, y, z.
+    wavenumber: ndarray
+        The wavenumbers at which to calculate. A single value or an ndarray can be given.
+    domain : str
+        The domain for which to calculate the bases, see above.
+    indexing_scheme : str
+        Chooses the indexing scheme of the output. See `indexing.expansions` for more details.
+
+    Returns
+    -------
+    F_n^m, complex ndarray
+        The calculated basis functions harmonics.
+
+    Note
+    ----
+    This function is optimized for calculation of all spherical bases, and will not have good performace
+    for e.g. zonal or sectorial components only.
+    """
     r, cos_theta, _, cos_phi, sin_phi = cartesian_2_trigonometric(position)
     kr = r * np.reshape(wavenumber, np.shape(wavenumber) + (1,) * np.ndim(r))
 
