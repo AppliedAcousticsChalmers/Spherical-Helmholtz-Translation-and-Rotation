@@ -84,3 +84,46 @@ def spherical_2_cartesian(radius, colatitude, azimuth):
     y = np.sin(colatitude) * np.sin(azimuth)
     z = np.cos(colatitude)
     return radius * np.stack([x, y, z], axis=0)
+
+
+def rotation_matrix(colatitude, primary_azimuth, secondary_azimuth):
+    return np.array([
+        [
+            np.cos(colatitude) * np.cos(secondary_azimuth) * np.cos(primary_azimuth) - np.sin(secondary_azimuth) * np.sin(primary_azimuth),
+            np.cos(colatitude) * np.cos(secondary_azimuth) * np.sin(primary_azimuth) + np.sin(secondary_azimuth) * np.cos(primary_azimuth),
+            -np.sin(colatitude) * np.cos(secondary_azimuth),
+        ],
+        [
+            -np.cos(colatitude) * np.sin(secondary_azimuth) * np.cos(primary_azimuth) - np.cos(secondary_azimuth) * np.sin(primary_azimuth),
+            np.cos(secondary_azimuth) * np.cos(primary_azimuth) - np.cos(colatitude) * np.sin(secondary_azimuth) * np.sin(primary_azimuth),
+            np.sin(colatitude) * np.sin(secondary_azimuth),
+        ],
+        [
+            np.sin(colatitude) * np.cos(primary_azimuth),
+            np.sin(colatitude) * np.sin(primary_azimuth),
+            np.cos(colatitude)
+        ],
+    ])
+
+
+def z_axes_rotation_angles(new_axis=None, old_axis=None):
+    if new_axis is None and old_axis is None:
+        raise ValueError('Must define at least the new z-axis or the old z-axis')
+
+    if new_axis is None:
+        _, colatitude, azimuth_old = cartesian_2_spherical(old_axis)
+        azimuth_new = 0
+    elif old_axis is None:
+        _, colatitude, azimuth_new = cartesian_2_spherical(new_axis)
+        azimuth_old = np.pi
+    else:
+        _, colatitude, azimuth_new = cartesian_2_spherical(new_axis)
+        _, colatitude_old, azimuth_old = cartesian_2_spherical(old_axis)
+        if not np.allclose(colatitude, colatitude_old):
+            raise ValueError('New z-axis and old z-axis does not have the same angle between them, check the inputs!')
+    return colatitude, azimuth_new, np.pi - azimuth_old
+
+
+def z_axes_rotation_matrix(new_axis=None, old_axis=None):
+    beta, alpha, mu = z_axes_rotation_angles(new_axis=new_axis, old_axis=old_axis)
+    return rotation_matrix(beta, alpha, mu)
