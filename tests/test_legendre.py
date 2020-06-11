@@ -3,21 +3,30 @@ import scipy.special
 import numpy as np
 import pytest
 
-nice_x = [np.linspace(-0.9, 0.9, 50), np.random.uniform(low=-0.9, high=0.9, size=(200, 200))]
-difficult_x = [-1, 0, 1]
 
-@pytest.mark.parametrize('x', nice_x + difficult_x)
-@pytest.mark.parametrize('max_order', [8, 12, 60])
-def test_sectorial(x, max_order):
-    implemented = faheltzmm.generate._legendre.sectorial(max_order, x)
-    implemented_scipy_norm = faheltzmm.generate._legendre.sectorial(max_order, x, normalization='scipy')
+@pytest.fixture(params=[8, 12, pytest.param(60, marks=pytest.mark.slow)])
+def order(request):
+    return request.param
+
+
+@pytest.fixture(params=[
+    -1, 0, 1, np.linspace(-0.9, 0.9, 50),
+    pytest.param(np.random.uniform(low=-0.9, high=0.9, size=(40, 40)), marks=pytest.mark.slow)
+])
+def x(request):
+    return request.param
+
+
+def test_sectorial(x, order):
+    implemented = faheltzmm.generate._legendre.sectorial(order, x)
+    implemented_scipy_norm = faheltzmm.generate._legendre.sectorial(order, x, normalization='scipy')
     out_arr = np.zeros(implemented.shape)
     out_arr_scipy = np.zeros(implemented.shape)
-    faheltzmm.generate._legendre.sectorial(max_order, x, out=out_arr)
-    faheltzmm.generate._legendre.sectorial(max_order, x, out=out_arr_scipy, normalization='scipy')
+    faheltzmm.generate._legendre.sectorial(order, x, out=out_arr)
+    faheltzmm.generate._legendre.sectorial(order, x, out=out_arr_scipy, normalization='scipy')
 
     x = np.asarray(x)
-    orders = np.arange(max_order + 1).reshape([max_order + 1] + [1] * x.ndim)
+    orders = np.arange(order + 1).reshape([order + 1] + [1] * x.ndim)
     applied_norm = (2 * scipy.special.factorial(2 * orders) / (2 * orders + 1))**0.5
     scipy_lpmv = scipy.special.lpmv(orders, orders, x)
 
@@ -27,24 +36,22 @@ def test_sectorial(x, max_order):
     np.testing.assert_allclose(scipy_lpmv, out_arr_scipy)
 
 
-@pytest.mark.parametrize('x', nice_x + difficult_x)
-@pytest.mark.parametrize('max_order', [8, 12, 60])
 @pytest.mark.parametrize('mode', [0, 4, 8])
-def test_order_expansion(x, mode, max_order):
+def test_order_expansion(x, mode, order):
     sectorial = faheltzmm.generate._legendre.sectorial(mode, x, normalization='complement')[-1]
 
-    implemented_orthonormal = faheltzmm.generate._legendre.order_expansion(sectorial, x, mode, max_order, normalization='orthonormal')
-    implemented_complement = faheltzmm.generate._legendre.order_expansion(sectorial, x, mode, max_order, normalization='complement')
-    implemented_scipy = faheltzmm.generate._legendre.order_expansion(sectorial, x, mode, max_order, normalization='scipy')
+    implemented_orthonormal = faheltzmm.generate._legendre.order_expansion(sectorial, x, mode, order, normalization='orthonormal')
+    implemented_complement = faheltzmm.generate._legendre.order_expansion(sectorial, x, mode, order, normalization='complement')
+    implemented_scipy = faheltzmm.generate._legendre.order_expansion(sectorial, x, mode, order, normalization='scipy')
 
     out_arr_complement = np.zeros(implemented_complement.shape)
     out_arr_orthonormal = np.zeros(implemented_orthonormal.shape)
     out_arr_scipy = np.zeros(implemented_scipy.shape)
-    faheltzmm.generate._legendre.order_expansion(sectorial, x, mode, max_order, out=out_arr_complement, normalization='complement')
-    faheltzmm.generate._legendre.order_expansion(sectorial, x, mode, max_order, out=out_arr_orthonormal, normalization='orthonormal')
-    faheltzmm.generate._legendre.order_expansion(sectorial, x, mode, max_order, out=out_arr_scipy, normalization='scipy')
+    faheltzmm.generate._legendre.order_expansion(sectorial, x, mode, order, out=out_arr_complement, normalization='complement')
+    faheltzmm.generate._legendre.order_expansion(sectorial, x, mode, order, out=out_arr_orthonormal, normalization='orthonormal')
+    faheltzmm.generate._legendre.order_expansion(sectorial, x, mode, order, out=out_arr_scipy, normalization='scipy')
 
-    orders = np.arange(mode, max_order + 1).reshape([-1] + [1] * np.ndim(x))
+    orders = np.arange(mode, order + 1).reshape([-1] + [1] * np.ndim(x))
     scipy_norm = (2 * scipy.special.factorial(mode + orders) / (2 * orders + 1) / scipy.special.factorial(orders - mode))**0.5
     complementary_norm = ((1 - x**2) ** 0.5) ** mode
     scipy_lpmv = scipy.special.lpmv(mode, orders, x)
@@ -57,8 +64,6 @@ def test_order_expansion(x, mode, max_order):
     np.testing.assert_allclose(implemented_scipy, out_arr_scipy)
 
 
-@pytest.mark.parametrize('x', nice_x + difficult_x)
-@pytest.mark.parametrize('order', [8, 12, 60])
 def test_mode_expansion(x, order):
     sectorial = faheltzmm.generate._legendre.sectorial(order, x, normalization='complementary')[-1]
 
@@ -86,23 +91,21 @@ def test_mode_expansion(x, order):
     np.testing.assert_allclose(implemented_scipy, out_arr_scipy)
 
 
-@pytest.mark.parametrize('max_order', [0, 1, 5, 12])
-@pytest.mark.parametrize('x', nice_x + difficult_x)
 @pytest.mark.parametrize('direction', ['orders', 'modes'])
-def test_legendre_all(max_order, x, direction):
-    implemented_complement = faheltzmm.generate._legendre.legendre_all(max_order, x, normalization='complement', direction=direction)
-    implemented_orthonormal = faheltzmm.generate._legendre.legendre_all(max_order, x, normalization='orthonormal', direction=direction)
-    implemented_scipy = faheltzmm.generate._legendre.legendre_all(max_order, x, normalization='scipy', direction=direction)
+def test_legendre_all(order, x, direction):
+    implemented_complement = faheltzmm.generate._legendre.legendre_all(order, x, normalization='complement', direction=direction)
+    implemented_orthonormal = faheltzmm.generate._legendre.legendre_all(order, x, normalization='orthonormal', direction=direction)
+    implemented_scipy = faheltzmm.generate._legendre.legendre_all(order, x, normalization='scipy', direction=direction)
 
     out_arr_complement = np.zeros(implemented_orthonormal.shape)
     out_arr_orthonormal = np.zeros(implemented_orthonormal.shape)
     out_arr_scipy = np.zeros(implemented_orthonormal.shape)
-    faheltzmm.generate._legendre.legendre_all(max_order, x, out=out_arr_complement, normalization='complement', direction=direction)
-    faheltzmm.generate._legendre.legendre_all(max_order, x, out=out_arr_orthonormal, normalization='orthonormal', direction=direction)
-    faheltzmm.generate._legendre.legendre_all(max_order, x, out=out_arr_scipy, normalization='scipy', direction=direction)
+    faheltzmm.generate._legendre.legendre_all(order, x, out=out_arr_complement, normalization='complement', direction=direction)
+    faheltzmm.generate._legendre.legendre_all(order, x, out=out_arr_orthonormal, normalization='orthonormal', direction=direction)
+    faheltzmm.generate._legendre.legendre_all(order, x, out=out_arr_scipy, normalization='scipy', direction=direction)
 
-    orders = np.arange(max_order + 1).reshape([max_order + 1, 1] + [1] * np.ndim(x))
-    modes = np.arange(max_order + 1).reshape([1, max_order + 1] + [1] * np.ndim(x))
+    orders = np.arange(order + 1).reshape([order + 1, 1] + [1] * np.ndim(x))
+    modes = np.arange(order + 1).reshape([1, order + 1] + [1] * np.ndim(x))
     complementary_norm = ((1 - x**2) ** 0.5) ** modes
     scipy_norm = (2 * scipy.special.factorial(modes + orders) / (2 * orders + 1) / np.where(orders < modes, 1, scipy.special.factorial(orders - modes)))**0.5
     scipy_lpmv = scipy.special.lpmv(modes, orders, x)
