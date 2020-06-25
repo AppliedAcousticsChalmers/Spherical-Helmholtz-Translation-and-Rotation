@@ -38,8 +38,9 @@ def colatitude_rotation_coefficients(max_order, colatitude=None, max_mode=None, 
     # TODO: It is certainly possible to use clever indexing to get rid of the two inner for loops.
     # If this is a significant contributor to calculation times, that might be a reasonable solution.
     # Another solution might be to use cython to make the loops run faster.
+
     def recurrence(m, n, mp):
-        coefficients[m, n, mp] = (
+        return (
             0.5 * (1 + cosine_colatitude) * np.sqrt((n + mp - 1) * (n + mp)) * coefficients[m - 1, n - 1, mp - 1]
             + 0.5 * (1 - cosine_colatitude) * np.sqrt((n - mp - 1) * (n - mp)) * coefficients[m - 1, n - 1, mp + 1]
             - sine_colatitude * np.sqrt((n + mp) * (n - mp)) * coefficients[m - 1, n - 1, mp]
@@ -50,26 +51,26 @@ def colatitude_rotation_coefficients(max_order, colatitude=None, max_mode=None, 
         for n in range(m, p + 1):
             coefficients[m, n, 0] = coefficients[0, n, m] * (-1) ** m
             coefficients[-m, n, 0] = coefficients[0, n, m]
-            recurrence(m, n, m)
+            coefficients[m, n, m] = recurrence(m, n, m)
             coefficients[-m, n, -m] = coefficients[m, n, m]
-            recurrence(m, n, -m)
+            coefficients[m, n, -m] = recurrence(m, n, -m)
             coefficients[-m, n, m] = coefficients[m, n, -m]
             for mp in range(m + 1, min(n, max_mode) + 1):
-                recurrence(m, n, mp)
+                coefficients[m, n, mp] = recurrence(m, n, mp)
                 coefficients[-m, n, -mp] = (-1)**(m + mp) * coefficients[m, n, mp]
                 coefficients[mp, n, m] = (-1)**(m + mp) * coefficients[m, n, mp]
                 coefficients[-mp, n, -m] = coefficients[m, n, mp]
 
-                recurrence(m, n, -mp)
+                coefficients[m, n, -mp] = recurrence(m, n, -mp)
                 coefficients[-m, n, mp] = (-1)**(m + mp) * coefficients[m, n, -mp]
                 coefficients[-mp, n, m] = (-1)**(m + mp) * coefficients[m, n, -mp]
                 coefficients[mp, n, -m] = coefficients[m, n, -mp]
 
             for mp in range(max_mode + 1, n + 1):
-                recurrence(m, n, mp)
+                coefficients[m, n, mp] = recurrence(m, n, mp)
                 coefficients[-m, n, -mp] = (-1)**(m + mp) * coefficients[m, n, mp]
 
-                recurrence(m, n, -mp)
+                coefficients[m, n, -mp] = recurrence(m, n, -mp)
                 coefficients[-m, n, mp] = (-1)**(m + mp) * coefficients[m, n, -mp]
 
     return np.delete(coefficients[:, :max_order + 1], np.arange(max_order + 1, max_order + 1 + 2 * max_mode), axis=2)
