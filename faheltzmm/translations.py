@@ -1,5 +1,41 @@
 import numpy as np
-from . import generate
+from . import generate, coordinates, rotations
+
+
+def translate(field_coefficients, position, wavenumber, input_domain, output_domain, max_output_order=None):
+    t, beta, alpha = coordinates.cartesian_2_spherical(position)
+    max_input_order = field_coefficients.shape[0] - 1
+    max_output_order = max_input_order if max_output_order is None else max_output_order
+    rotation_coefficients = rotations.rotation_coefficients(max_order=max(max_input_order, max_output_order), primary_azimuth=alpha, colatitude=beta)
+    translation_coefficients = coaxial_translation_coefficients(
+        max_input_order=max_input_order, max_output_order=max_output_order,
+        distance=t, wavenumber=wavenumber,
+        input_domain=input_domain, output_domain=output_domain)
+    return translation(field_coefficients, translation_coefficients, rotation_coefficients)
+
+
+def translation(field_coefficients, translation_coefficients, rotation_coefficients):
+    max_input_order = translation_coefficients.shape[1] - 1
+    max_output_order = translation_coefficients.shape[2] - 1
+    max_modes = (translation_coefficients.shape[0] - 1) // 2
+    if max_input_order != max_output_order:
+        raise NotImplementedError('Changing the order during translation not yet implemented')
+    if max_modes != max_input_order:
+        raise NotImplementedError('Mode-limited translations not yet supported')
+
+    if max_input_order != field_coefficients.shape[0] - 1:
+        raise ValueError('Translation coefficients and field coefficients does not have the same maximum order')
+    if 2 * max_modes + 1 != field_coefficients.shape[1]:
+        raise ValueError('Translation coefficients and field coefficients does not have the same maximum modes')
+    if max_input_order != rotation_coefficients.shape[1] - 1:
+        raise ValueError('Rotation coefficients and field coefficients does not have the same maximum order')
+    if 2 * max_modes + 1 != rotation_coefficients.shape[0] or rotation_coefficients.shape[0] != rotation_coefficients.shape[2]:
+        raise ValueError('Rotation coefficients does not have the correct number of modes')
+
+    field_coefficients = rotations.rotate(field_coefficients=field_coefficients, rotation_coefficients=rotation_coefficients, inverse=False)
+    field_coefficients = np.einsum('nm, mnp -> pm', field_coefficients, translation_coefficients)
+    field_coefficients = rotations.rotate(field_coefficients=field_coefficients, rotation_coefficients=rotation_coefficients, inverse=True)
+    return field_coefficients
 
 
 def coaxial_translation_coefficients(max_input_order, max_output_order, distance, wavenumber, input_domain, output_domain, max_mode=None):
