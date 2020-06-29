@@ -39,11 +39,13 @@ old_fig_layout = dict(
     fig_layout,
     xaxis=dict(range=(min(z), max(z))),
     yaxis=dict(range=(min(x), max(x))),
+    title=f'y={y}'
 )
 new_fig_layout = dict(
     fig_layout,
     xaxis=dict(range=(min(ζ), max(ζ))),
     yaxis=dict(range=(min(ξ), max(ξ))),
+    title=f'y={η}'
 )
 
 x_mesh, y_mesh, z_mesh = old_mesh = np.stack(np.meshgrid(x, y, z, indexing='ij'), axis=0).squeeze()
@@ -54,8 +56,11 @@ new_bases_exterior = faheltzmm.generate.spherical_base_all(max_order=max_order, 
 
 
 # %%
-source_positions = np.array([[-0.1, 0.1, 0.1], [0.1, -0.1, -0.1]]).T
-source_amplitudes = np.array([1, np.exp(0.5j * np.pi)])
+n_sources = 32
+source_positions = faheltzmm.coordinates.spherical_2_cartesian(radius=0.5743 * wavelength, colatitude=np.pi / 2, azimuth=np.arange(n_sources) / n_sources * np.pi * 2)
+source_positions[2] = source_positions[0]
+source_positions[0] = 0
+source_amplitudes = np.ones(n_sources) * (1 + 1j)
 old_coefficients = faheltzmm.generate.spherical_base_all(max_order=max_order, domain='interior', wavenumber=wavenumber, position=source_positions).conj().dot(source_amplitudes)
 
 new_coefficients_interior = faheltzmm.translations.translate(old_coefficients, translation_position, wavenumber, 'exterior', 'interior')

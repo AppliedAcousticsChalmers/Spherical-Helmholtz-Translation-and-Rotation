@@ -80,6 +80,7 @@ def spherical_2_cartesian(radius, colatitude, azimuth):
         A 3x... shape array with the cartesian positions [x, y, z] in the
         first axis.
     """
+    radius, colatitude, azimuth = np.broadcast_arrays(radius, colatitude, azimuth)
     x = np.sin(colatitude) * np.cos(azimuth)
     y = np.sin(colatitude) * np.sin(azimuth)
     z = np.cos(colatitude)

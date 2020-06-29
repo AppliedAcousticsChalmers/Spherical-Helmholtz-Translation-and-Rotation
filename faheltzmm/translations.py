@@ -38,6 +38,14 @@ def translation(field_coefficients, translation_coefficients, rotation_coefficie
     return field_coefficients
 
 
+def coaxial_translation(field_coefficients, translation_coefficients, inverse=False):
+    if inverse:
+        p = np.arange(translation_coefficients.shape[2])
+        return np.einsum('nm..., mpn -> pm', field_coefficients, translation_coefficients)
+    else:
+        return np.einsum('nm..., mnp -> pm', field_coefficients, translation_coefficients)
+
+
 def coaxial_translation_coefficients(max_input_order, max_output_order, distance, wavenumber, input_domain, output_domain, max_mode=None):
     if 'singular' in input_domain.lower() or 'exterior' in input_domain.lower() or 'external' in input_domain.lower():
         input_domain = 'singular'
