@@ -17,14 +17,17 @@ def rotation_coefficients(max_order, colatitude=0, primary_azimuth=0, secondary_
 
 
 def rotate(field_coefficients, rotation_coefficients=rotation_coefficients, inverse=False, **kwargs):
+    # TODO: Rename to rotation!
+    # It's not really feasible to the the active form for the translations unless we accept "translate_coaxially",
+    # so it might be better to use a passive form for all operations.
     if callable(rotation_coefficients):
         orders = field_coefficients.shape[0] - 1
         modes = (field_coefficients.shape[1] - 1) // 2
         rotation_coefficients = rotation_coefficients(max_order=orders, max_mode=modes, **kwargs)
     if inverse:
-        return np.einsum('pnm, nm... -> np', rotation_coefficients.conj(), field_coefficients)
+        return np.einsum('pnm..., nm... -> np...', rotation_coefficients.conj(), field_coefficients)
     else:
-        return np.einsum('mnp, nm... -> np', rotation_coefficients, field_coefficients)
+        return np.einsum('mnp..., nm... -> np...', rotation_coefficients, field_coefficients)
 
 
 def colatitude_rotation_coefficients(max_order, colatitude=None, max_mode=None, cosine_colatitude=None):
@@ -32,7 +35,7 @@ def colatitude_rotation_coefficients(max_order, colatitude=None, max_mode=None, 
     sine_colatitude = (1 - cosine_colatitude**2)**0.5
 
     max_mode = max_order if max_mode is None else min(max_mode, max_order)
-    coefficients = np.zeros((2 * max_mode + 1, max_order + max_mode + 1, 2 * (max_order + max_mode) + 1), dtype=float)
+    coefficients = np.zeros((2 * max_mode + 1, max_order + max_mode + 1, 2 * (max_order + max_mode) + 1) + cosine_colatitude.shape, dtype=float)
     coefficients[0] = zonal_colatitude_rotation_coefficients(max_order=max_order + max_mode, cosine_colatitude=cosine_colatitude)
 
     # TODO: It is certainly possible to use clever indexing to get rid of the two inner for loops.
@@ -72,7 +75,6 @@ def colatitude_rotation_coefficients(max_order, colatitude=None, max_mode=None, 
 
                 coefficients[m, n, -mp] = recurrence(m, n, -mp)
                 coefficients[-m, n, mp] = (-1)**(m + mp) * coefficients[m, n, -mp]
-
     return np.delete(coefficients[:, :max_order + 1], np.arange(max_order + 1, max_order + 1 + 2 * max_mode), axis=2)
 
 

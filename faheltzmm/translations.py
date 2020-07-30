@@ -3,6 +3,7 @@ from . import generate, coordinates, rotations
 
 
 def translate(field_coefficients, position, wavenumber, input_domain, output_domain, max_output_order=None):
+    # TODO: Merge this with the translation function.
     t, beta, alpha = coordinates.cartesian_2_spherical(position)
     max_input_order = field_coefficients.shape[0] - 1
     max_output_order = max_input_order if max_output_order is None else max_output_order
@@ -33,19 +34,22 @@ def translation(field_coefficients, translation_coefficients, rotation_coefficie
         raise ValueError('Rotation coefficients does not have the correct number of modes')
 
     field_coefficients = rotations.rotate(field_coefficients=field_coefficients, rotation_coefficients=rotation_coefficients, inverse=False)
-    field_coefficients = np.einsum('nm, mnp -> pm', field_coefficients, translation_coefficients)
+    field_coefficients = np.einsum('nm..., mnp... -> pm...', field_coefficients, translation_coefficients)
     field_coefficients = rotations.rotate(field_coefficients=field_coefficients, rotation_coefficients=rotation_coefficients, inverse=True)
     return field_coefficients
 
 
 def coaxial_translation(field_coefficients, translation_coefficients, inverse=False):
+    # TODO: Add checks for size conformity here
+    # TODO: Do a similar trick with distance/wavenumber as for the rotations to allow a single use input form.
+    # TODO: Allow inverse coaxial translation. This is particularly useful for multiple scattering problems.
     if inverse:
-        p = np.arange(translation_coefficients.shape[2])
         return np.einsum('nm..., mpn -> pm', field_coefficients, translation_coefficients)
     else:
         return np.einsum('nm..., mnp -> pm', field_coefficients, translation_coefficients)
 
 
+# TODO: Add some kind of function to calculate both the roation coefficients and the translation coefficients in one go. Preferably in a form which can exploit
 def coaxial_translation_coefficients(max_input_order, max_output_order, distance, wavenumber, input_domain, output_domain, max_mode=None):
     if 'singular' in input_domain.lower() or 'exterior' in input_domain.lower() or 'external' in input_domain.lower():
         input_domain = 'singular'
@@ -63,7 +67,7 @@ def coaxial_translation_coefficients(max_input_order, max_output_order, distance
 
     kt = distance * wavenumber
     max_mode = max_input_order if max_mode is None else max_mode
-    coefficients_shape = [2 * max_mode + 1, max_input_order + 1, max_output_order + max_input_order + 1] + [1] * np.ndim(kt)
+    coefficients_shape = (2 * max_mode + 1, max_input_order + 1, max_output_order + max_input_order + 1) + np.shape(kt)
 
     all_n = np.arange(max_output_order + max_input_order + 1).reshape([-1] + [1] * np.ndim(kt))
     if input_domain == 'singular' and output_domain == 'regular':
@@ -90,7 +94,7 @@ def coaxial_translation_coefficients(max_input_order, max_output_order, distance
         return value * ((2 * n - 1) * (2 * n + 1) / ((n + m) * (n - m)))**0.5
 
     # Using the (m, n, p) -> (m, p, n) symmetry to get (0, n, 0)
-    coefficients[0, :, 0] = coefficients[0, 0, :max_input_order + 1] * (-1) ** np.arange(max_input_order + 1)
+    coefficients[0, :, 0] = coefficients[0, 0, :max_input_order + 1] * (-1) ** np.arange(max_input_order + 1).reshape([-1] + [1] * np.ndim(kt))
     # Recurrence to fill m=0 layer, the same as in the loop below exept for the
     # sectorial values.
     for n in range(1, max_input_order + 1):
@@ -124,5 +128,4 @@ def coaxial_translation_coefficients(max_input_order, max_output_order, distance
             for p in range(max_input_order + 1, max_output_order + max_input_order - n + 1):
                 coefficients[m, n, p] = recurrence(m, n, p)
                 coefficients[-m, n, p] = coefficients[m, n, p]
-
     return coefficients[:, :, :max_output_order + 1]
