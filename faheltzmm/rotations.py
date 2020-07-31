@@ -2,6 +2,62 @@ import numpy as np
 from . import generate, indexing, coordinates
 
 
+class ColatitudeRotation:
+    def __init__(self, order):
+        self._order = order
+        self._data = []
+        # Temporary storage of the component indices
+        for n in range(self.order + 1):
+            for p in range(-self.order, self.order + 1):
+                for m in range(-self.order, self.order + 1):
+                    if abs(p) > n or abs(m) > n:
+                        continue  # Is zero by definition, don't store
+                    if p < 0:
+                        continue  # We're storing positive values of p
+                    if abs(m) > p:
+                        continue  # Far away from the starting values
+                    self._data.append((n, p, m))
+
+    def _idx(self, order, mode_out, mode_in):
+        if abs(mode_out) > order:
+            raise IndexError(f'Mode {mode_out} is out of bounds for order {order}')
+        if abs(mode_in) > order:
+            raise IndexError(f'Mode {mode_in} is out of bounds for order {order}')
+        if order < 0 or order > self.order:
+            raise IndexError(f'Order {order} is out of bounds for {self.__class__.__name__} with max order {self.order}')
+        if mode_out < 0:
+            raise IndexError(f'Component {(order, mode_out, mode_in)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
+        if abs(mode_in) > mode_out:
+            raise IndexError(f'Component {(order, mode_out, mode_in)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
+
+        return order * (order + 1) * (2 * order + 1) // 6 + mode_out ** 2 + mode_out + mode_in
+
+    def __getitem__(self, key):
+        n, p, m = key
+
+        symm = ''
+        if abs(p) < m:
+            p, m = m, p
+            symm += 'swap'
+        if abs(m) <= -p > 0:
+            p, m = -p, -m
+            symm += 'negate'
+        if abs(p) < -m:
+            p, m, = -m, -p
+            symm += 'negate & swap'
+
+        value = self._data[self._idx(n, p, m)]
+        return value, symm
+
+    @property
+    def order(self):
+        return self._order
+
+    @property
+    def num_unique(self):
+        return (self.order + 1) * (self.order + 2) * (2 * self.order + 3) // 6
+
+
 def rotation_coefficients(max_order, colatitude=0, primary_azimuth=0, secondary_azimuth=0, max_mode=None, new_z_axis=None, old_z_axis=None):
     if new_z_axis is not None:
         beta, alpha, mu = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
