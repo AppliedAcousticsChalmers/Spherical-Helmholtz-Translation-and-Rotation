@@ -1,12 +1,17 @@
 import numpy as np
-from . import generate, indexing, coordinates
+from . import generate, indexing, coordinates, bases
 
 
 class ColatitudeRotation:
-    def __init__(self, order):
+    def __init__(self, order, colatitude=None, cosine_colatitude=None, sine_colatitude=None, shape=None):
         self._order = order
-        self._data = []
-        # Temporary storage of the component indices
+        self._shape = shape if shape is not None else np.shape(cosine_colatitude if cosine_colatitude is not None else colatitude)
+        self._data = np.zeros((self.num_unique,) + self.shape, dtype=float)
+        if colatitude is not None or cosine_colatitude is not None:
+            self.evaluate(colatitude=colatitude, cosine_colatitude=cosine_colatitude, sine_colatitude=sine_colatitude)
+
+        # DEBUG: Storing the coefficient indices in a flat list to make sure that the indexing is working properly.
+        self._indces = []
         for n in range(self.order + 1):
             for p in range(-self.order, self.order + 1):
                 for m in range(-self.order, self.order + 1):
@@ -16,7 +21,7 @@ class ColatitudeRotation:
                         continue  # We're storing positive values of p
                     if abs(m) > p:
                         continue  # Far away from the starting values
-                    self._data.append((n, p, m))
+                    self._indces.append((n, p, m))
 
     def _idx(self, order, mode_out, mode_in):
         if abs(mode_out) > order:
@@ -35,6 +40,21 @@ class ColatitudeRotation:
     def __getitem__(self, key):
         n, p, m = key
 
+        if abs(p) < m:
+            p, m = m, p
+            sign = (-1)**(m + p)
+        elif abs(m) <= -p > 0:
+            p, m = -p, -m
+            sign = (-1)**(m + p)
+        elif abs(p) < -m:
+            p, m, = -m, -p
+            sign = 1
+        elif p >= 0 and abs(m) <= p:
+            # Safe guard against stupidity
+            sign = 1
+        return sign * self._data[self._idx(n, p, m)]
+
+        # DEBUG: The rest of this function is debugging code.
         symm = ''
         if abs(p) < m:
             p, m = m, p
@@ -49,6 +69,63 @@ class ColatitudeRotation:
         value = self._data[self._idx(n, p, m)]
         return value, symm
 
+    def evaluate(self, colatitude=None, cosine_colatitude=None, sine_colatitude=None):
+        cosine_colatitude = np.cos(colatitude) if cosine_colatitude is None else np.asarray(cosine_colatitude)
+        sine_colatitude = (1 - cosine_colatitude**2)**0.5 if sine_colatitude is None else np.asarray(sine_colatitude)
+
+        legendre = bases.AssociatedLegendrePolynomials(order=self.order, x=cosine_colatitude)
+
+        # n=0 and n=1 will be special cases since the p=n-1 and p=n special cases will not behave
+        self._data[self._idx(0, 0, 0)] = 1
+        self._data[self._idx(1, 0, 0)] = cosine_colatitude
+        self._data[self._idx(1, 1, -1)] = (1 - cosine_colatitude) * 0.5
+        self._data[self._idx(1, 1, 0)] = sine_colatitude * 2**-0.5
+        self._data[self._idx(1, 1, 1)] = (1 + cosine_colatitude) * 0.5
+
+        for n in range(2, self.order + 1):
+            for p in range(0, n - 1):
+                for m in range(-p, 0):
+                    # Use recurrence for decreasing m here
+                    self._data[self._idx(n, p, m)] = (
+                        self._data[self._idx(n - 1, p - 1, m + 1)] * 0.5 * (1 - cosine_colatitude) * ((n + p - 1) * (n + p))**0.5
+                        + self._data[self._idx(n - 1, p, m + 1)] * sine_colatitude * ((n + p) * (n - p))**0.5
+                        + self._data[self._idx(n - 1, p + 1, m + 1)] * 0.5 * (1 + cosine_colatitude) * ((n - p - 1) * (n - p))**0.5
+                    ) / ((n - m - 1) * (n - m))**0.5
+                # Assign the m=0 value here
+                self._data[self._idx(n, p, 0)] = legendre[n, p] * (-1)**p * (2 / (2 * n + 1))**0.5
+                for m in range(1, p + 1):
+                    # Use recurrence for increasing m here
+                    self._data[self._idx(n, p, m)] = (
+                        self._data[self._idx(n - 1, p - 1, m - 1)] * 0.5 * (1 + cosine_colatitude) * ((n + p - 1) * (n + p))**0.5
+                        - self._data[self._idx(n - 1, p, m - 1)] * sine_colatitude * ((n + p) * (n - p))**0.5
+                        + self._data[self._idx(n - 1, p + 1, m - 1)] * 0.5 * (1 - cosine_colatitude) * ((n - p - 1) * (n - p))**0.5
+                    ) / ((n + m - 1) * (n + m))**0.5
+
+            # p=n-1 and p=n are special cases since one or two values are missing in the recurrences
+            # p = n-1
+            for m in range(-(n - 1), 0):
+                self._data[self._idx(n, n - 1, m)] = (
+                    self._data[self._idx(n - 1, n - 2, m + 1)] * 0.5 * (1 - cosine_colatitude) * (2 * (n - 1) * (2 * n - 1))**0.5
+                    + self._data[self._idx(n - 1, n - 1, m + 1)] * sine_colatitude * (2 * n - 1)**0.5
+                ) / ((n - m - 1) * (n - m))**0.5
+            self._data[self._idx(n, n - 1, 0)] = legendre[n, n - 1] * (-1)**(n - 1) * (2 / (2 * n + 1))**0.5
+            for m in range(1, n):
+                self._data[self._idx(n, n - 1, m)] = (
+                    self._data[self._idx(n - 1, n - 1 - 1, m - 1)] * 0.5 * (1 + cosine_colatitude) * (2 * (n - 1) * (2 * n - 1))**0.5
+                    - self._data[self._idx(n - 1, n - 1, m - 1)] * sine_colatitude * (2 * n - 1)**0.5
+                ) / ((n + m - 1) * (n + m))**0.5
+            # p = n
+            for m in range(-n, 0):
+                self._data[self._idx(n, n, m)] = (
+                    self._data[self._idx(n - 1, n - 1, m + 1)] * 0.5 * (1 - cosine_colatitude) * ((2 * n - 1) * 2 * n)**0.5
+                ) / ((n - m - 1) * (n - m))**0.5
+            self._data[self._idx(n, n, 0)] = legendre[n, n] * (-1)**n * (2 / (2 * n + 1))**0.5
+            for m in range(1, n + 1):
+                # Use recurrence for increasing m here
+                self._data[self._idx(n, n, m)] = (
+                    self._data[self._idx(n - 1, n - 1, m - 1)] * 0.5 * (1 + cosine_colatitude) * ((2 * n - 1) * 2 * n)**0.5
+                ) / ((n + m - 1) * (n + m))**0.5
+
     @property
     def order(self):
         return self._order
@@ -56,6 +133,11 @@ class ColatitudeRotation:
     @property
     def num_unique(self):
         return (self.order + 1) * (self.order + 2) * (2 * self.order + 3) // 6
+
+    @property
+    def shape(self):
+        return self._shape
+
 
 
 def rotation_coefficients(max_order, colatitude=0, primary_azimuth=0, secondary_azimuth=0, max_mode=None, new_z_axis=None, old_z_axis=None):
