@@ -110,6 +110,41 @@ class ColatitudeRotation:
 
 
 
+class Rotation(ColatitudeRotation):
+    def __init__(self, order, colatitude=0, primary_azimuth=0, secondary_azimuth=0, new_z_axis=None, old_z_axis=None, **kwargs):
+        if new_z_axis is not None:
+            colatitude, primary_azimuth, secondary_azimuth = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
+        self.primary_azimuth = primary_azimuth
+        self.secondary_azimuth = secondary_azimuth
+        super().__init__(order=order, colatitude=colatitude, **kwargs)
+
+    @property
+    def primary_azimuth(self):
+        return self._primary_azimuth
+
+    @primary_azimuth.setter
+    def primary_azimuth(self, value):
+        self._primary_azimuth = value
+        self._primary_phase = np.exp(1j * value)
+
+    @property
+    def secondary_azimuth(self):
+        return self._secondary_azimuth
+
+    @secondary_azimuth.setter
+    def secondary_azimuth(self, value):
+        self._secondary_azimuth = value
+        self._secondary_phase = np.exp(1j * value)
+
+    @property
+    def shape(self):
+        return np.broadcast(self._data[0], self._primary_phase, self._secondary_phase).shape
+
+    def __getitem__(self, key):
+        n, p, m = key
+        phase = self._primary_phase ** m * self._secondary_phase ** p
+        return super().__getitem__(key) * phase
+
 
 def rotation_coefficients(max_order, colatitude=0, primary_azimuth=0, secondary_azimuth=0, max_mode=None, new_z_axis=None, old_z_axis=None):
     if new_z_axis is not None:
