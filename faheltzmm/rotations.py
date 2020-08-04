@@ -6,22 +6,18 @@ class ColatitudeRotation:
     def __init__(self, order, colatitude=None, cosine_colatitude=None, sine_colatitude=None, shape=None):
         self._order = order
         self._shape = shape if shape is not None else np.shape(cosine_colatitude if cosine_colatitude is not None else colatitude)
-        self._data = np.zeros((self.num_unique,) + self.shape, dtype=float)
+        num_unique = (self.order + 1) * (self.order + 2) * (2 * self.order + 3) // 6
+        self._data = np.zeros((num_unique,) + self._shape, dtype=float)
         if colatitude is not None or cosine_colatitude is not None:
             self.evaluate(colatitude=colatitude, cosine_colatitude=cosine_colatitude, sine_colatitude=sine_colatitude)
 
-        # DEBUG: Storing the coefficient indices in a flat list to make sure that the indexing is working properly.
-        self._indces = []
-        for n in range(self.order + 1):
-            for p in range(-self.order, self.order + 1):
-                for m in range(-self.order, self.order + 1):
-                    if abs(p) > n or abs(m) > n:
-                        continue  # Is zero by definition, don't store
-                    if p < 0:
-                        continue  # We're storing positive values of p
-                    if abs(m) > p:
-                        continue  # Far away from the starting values
-                    self._indces.append((n, p, m))
+    @property
+    def order(self):
+        return self._order
+
+    @property
+    def shape(self):
+        return self._shape
 
     def _idx(self, order, mode_out, mode_in):
         if abs(mode_out) > order:
@@ -50,24 +46,10 @@ class ColatitudeRotation:
             p, m, = -m, -p
             sign = 1
         elif p >= 0 and abs(m) <= p:
-            # Safe guard against stupidity
+            # If don't end up here it means we missed a case.
+            # It would be obvious since the sign variable will not exist for the return statement.
             sign = 1
         return sign * self._data[self._idx(n, p, m)]
-
-        # DEBUG: The rest of this function is debugging code.
-        symm = ''
-        if abs(p) < m:
-            p, m = m, p
-            symm += 'swap'
-        if abs(m) <= -p > 0:
-            p, m = -p, -m
-            symm += 'negate'
-        if abs(p) < -m:
-            p, m, = -m, -p
-            symm += 'negate & swap'
-
-        value = self._data[self._idx(n, p, m)]
-        return value, symm
 
     def evaluate(self, colatitude=None, cosine_colatitude=None, sine_colatitude=None):
         cosine_colatitude = np.cos(colatitude) if cosine_colatitude is None else np.asarray(cosine_colatitude)
@@ -126,17 +108,6 @@ class ColatitudeRotation:
                     self._data[self._idx(n - 1, n - 1, m - 1)] * 0.5 * (1 + cosine_colatitude) * ((2 * n - 1) * 2 * n)**0.5
                 ) / ((n + m - 1) * (n + m))**0.5
 
-    @property
-    def order(self):
-        return self._order
-
-    @property
-    def num_unique(self):
-        return (self.order + 1) * (self.order + 2) * (2 * self.order + 3) // 6
-
-    @property
-    def shape(self):
-        return self._shape
 
 
 

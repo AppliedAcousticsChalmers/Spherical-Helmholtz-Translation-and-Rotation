@@ -8,14 +8,11 @@ class AssociatedLegendrePolynomials:
         self._order = order
         self.normalization = normalization
         self._shape = shape if shape is not None else np.shape(x)
-        self._data = np.zeros((self.num_unique,) + self.shape, dtype=float)
+        num_unique = (self.order + 1) * (self.order + 2) // 2
+        self._data = np.zeros((num_unique,) + self.shape, dtype=float)
 
         if x is not None:
             self.evaluate(x)
-
-    @property
-    def num_unique(self):
-        return (self.order + 1) * (self.order + 2) // 2
 
     @property
     def order(self):
@@ -81,7 +78,6 @@ class SphericalBessel:
     def __init__(self, order, x=None, shape=None):
         self._order = order
         self._shape = shape if shape is not None else np.shape(x)
-        # self._data = np.zeros((self.num_unique,) + shape, dtype=float)  # Not needed since the evaluation always creates a new copy
 
         if x is not None:
             self.evaluate(x)
@@ -93,10 +89,6 @@ class SphericalBessel:
     @property
     def order(self):
         return self._order
-
-    @property
-    def num_unique(self):
-        return self.order + 1
 
     @property
     def shape(self):
@@ -137,10 +129,6 @@ class SphericalHarmonics:
         return self._legendre[order, mode] * self._azimuth ** mode / (2 * np.pi)**0.5
 
     @property
-    def num_unique(self):
-        return self._legendre.num_unique
-
-    @property
     def order(self):
         return self._legendre.order
 
@@ -170,10 +158,6 @@ class SphericalBase:
     @property
     def shape(self):
         return self._angular.shape
-
-    @property
-    def num_unique(self):
-        return self._angular.num_unique
 
     def __getitem__(self, key):
         order, mode = key
