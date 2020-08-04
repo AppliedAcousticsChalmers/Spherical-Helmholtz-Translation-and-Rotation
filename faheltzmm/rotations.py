@@ -1,5 +1,5 @@
 import numpy as np
-from . import generate, indexing, coordinates, bases
+from . import generate, indexing, coordinates, bases, expansions
 
 
 class ColatitudeRotation:
@@ -108,6 +108,42 @@ class ColatitudeRotation:
                     self._data[self._idx(n - 1, n - 1, m - 1)] * 0.5 * (1 + cosine_colatitude) * ((2 * n - 1) * 2 * n)**0.5
                 ) / ((n + m - 1) * (n + m))**0.5
 
+    def apply(self, expansion, inverse=False, out=None):
+        if out is None:
+            shape = np.broadcast(self[0, 0, 0], expansion[0, 0]).shape
+            if isinstance(expansion, expansions.Expansion):
+                out = type(expansion)(order=self.order, shape=shape, wavenumber=expansion.wavenumber)
+            else:
+                out = expansions.Expansion(order=self.order, shape=shape)
+        elif expansion is out:
+            raise NotImplementedError('Rotations cannot currently be applied in place')
+        # TODO: Check that the order matches?
+        if not inverse:
+            for n in range(self.order + 1):
+                for p in range(-n, n + 1):
+                    # Use a local temporary variable to accumulate the summed value.
+                    # We might not always be able to add in place to the components of the output.
+                    value = 0
+                    for m in range(-n, n + 1):
+                        value += expansion[n, m] * self[n, p, m]
+                    out[n, p] = value
+        else:
+            for n in range(self.order + 1):
+                for m in range(-n, n + 1):
+                    value = 0
+                    for p in range(-n, n + 1):
+                        # Conjugate will not do anything for colatitude rotations,
+                        # but full rotations use this method as well.
+                        # The method version of conjugate (as opposed to np.conjugate)
+                        # will not create copies of real arrays.
+                        # value += expansion[n, p] * self[n, p, m].conjugate()
+
+                        # Alternate version doing the same thing but exploiting
+                        # symmetries instead of actuallly conjugating.
+                        # This seems to be a little bit faster.
+                        value += expansion[n, p] * (-1)**(m + p) * self[n, -p, -m]
+                    out[n, m] = value
+        return out
 
 
 class Rotation(ColatitudeRotation):
