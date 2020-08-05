@@ -2,6 +2,79 @@ import numpy as np
 from . import generate, coordinates, rotations
 
 
+class CoaxialTranslation:
+    def __init__(self, input_order, output_order, distance=None, wavenumber=None, shape=None):
+        self._input_order = input_order
+        self._output_order = output_order
+        self._min_order = min(self.input_order, self.output_order)
+        self._max_order = max(self.input_order, self.output_order)
+        self._shape = np.broadcast(distance, wavenumber).shape if shape is None else shape
+        num_unique = (
+            (self._min_order + 1)**2 * (self._max_order + 1)
+            - (self._min_order * (self._min_order + 1)) // 2 * (self._min_order + self._max_order + 2)
+            + (self._min_order * (self._min_order - 1) * (self._min_order + 1)) // 6
+        )
+        self._data = np.zeros((num_unique,) + self._shape, self._dtype)
+
+    @property
+    def order(self):
+        return (self.input_order, self.output_order)
+
+    @property
+    def input_order(self):
+        return self._input_order
+
+    @property
+    def output_order(self):
+        return self._output_order
+
+    @property
+    def shape(self):
+        return self._shape
+
+    def _idx(self, input_order, output_order, mode):
+        if abs(mode) > input_order:
+            raise IndexError(f'Mode {mode} is out of bounds for input order {input_order}')
+        if abs(mode) > output_order:
+            raise IndexError(f'Mode {mode} is out of bounds for output order {output_order}')
+        if input_order > self.input_order:
+            raise IndexError(f'Input order {input_order} is out of bounds for {self.__class__.__name__} with max input order {self.input_order}')
+        if output_order > self.output_order:
+            raise IndexError(f'Input order {output_order} is out of bounds for {self.__class__.__name__} with max output order {self.output_order}')
+        if input_order > output_order:
+            raise IndexError(f'Component {(input_order, output_order, mode)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
+        if mode < 0:
+            raise IndexError(f'Component {(input_order, output_order, mode)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
+        # Data is stored in [mode, input_order, output_order] (m, n, p) order
+        mode_offset = (
+            mode * (self._min_order + 1) * (self._max_order + 1)
+            - (self._max_order + 1) * (mode * (mode - 1)) // 2
+            - mode * (self._min_order * (self._min_order + 1)) // 2
+            + (mode * (mode - 1) * (mode - 2)) // 6
+        )
+        order_offset = (input_order - mode) * (self._max_order + 1) + (mode * (mode - 1) - input_order * (input_order - 1)) // 2
+        return mode_offset + order_offset + output_order - input_order
+
+    def __getitem__(self, key):
+        n, p, m = key
+        if n > p:
+            return (-1)**(n + p) * self._data[self._idx(p, n, abs(m))]
+        else:
+            return self._data[self._idx(n, p, abs(m))]
+
+
+class InteriorCoaxialTranslation(CoaxialTranslation):
+    _dtype = float
+
+
+class ExteriorCoaxialTranslation(CoaxialTranslation):
+    _dtype = float
+
+
+class ExteriorInteriorCoaxialTranslation(CoaxialTranslation):
+    _dtype = complex
+
+
 def translate(field_coefficients, position, wavenumber, input_domain, output_domain, max_output_order=None):
     # TODO: Merge this with the translation function.
     t, beta, alpha = coordinates.cartesian_2_spherical(position)
