@@ -19,19 +19,39 @@ class ColatitudeRotation:
     def shape(self):
         return self._shape
 
-    def _idx(self, order, mode_out, mode_in):
-        if abs(mode_out) > order:
-            raise IndexError(f'Mode {mode_out} is out of bounds for order {order}')
-        if abs(mode_in) > order:
-            raise IndexError(f'Mode {mode_in} is out of bounds for order {order}')
-        if order < 0 or order > self.order:
-            raise IndexError(f'Order {order} is out of bounds for {self.__class__.__name__} with max order {self.order}')
-        if mode_out < 0:
-            raise IndexError(f'Component {(order, mode_out, mode_in)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
-        if abs(mode_in) > mode_out:
-            raise IndexError(f'Component {(order, mode_out, mode_in)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
+    def _idx(self, order=None, mode_out=None, mode_in=None, index=None):
+        if index is None:
+            # Default mode, get the linear index of a component
+            if abs(mode_out) > order:
+                raise IndexError(f'Mode {mode_out} is out of bounds for order {order}')
+            if abs(mode_in) > order:
+                raise IndexError(f'Mode {mode_in} is out of bounds for order {order}')
+            if order < 0 or order > self.order:
+                raise IndexError(f'Order {order} is out of bounds for {self.__class__.__name__} with max order {self.order}')
+            if mode_out < 0:
+                raise IndexError(f'Component {(order, mode_out, mode_in)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
+            if abs(mode_in) > mode_out:
+                raise IndexError(f'Component {(order, mode_out, mode_in)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
 
-        return order * (order + 1) * (2 * order + 1) // 6 + mode_out ** 2 + mode_out + mode_in
+            return order * (order + 1) * (2 * order + 1) // 6 + mode_out ** 2 + mode_out + mode_in
+        else:
+            # Inverse mode, get the component indices of a linear index
+            order = 0
+            while (order + 1) * (order + 2) * (2 * order + 3) // 6 <= index:
+                order += 1
+            index -= order * (order + 1) * (2 * order + 1) // 6
+            mode_out = int(index ** 0.5)
+            mode_in = index - mode_out * (mode_out + 1)
+            return order, mode_out, mode_in
+
+    @property
+    def _coefficient_indices(self):
+        out = []
+        for n in range(self.order + 1):
+            for p in range(n + 1):
+                for m in range(-p, p + 1):
+                    out.append((n, p, m))
+        return out
 
     def __getitem__(self, key):
         n, p, m = key

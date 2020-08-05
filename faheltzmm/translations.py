@@ -32,28 +32,54 @@ class CoaxialTranslation:
     def shape(self):
         return self._shape
 
-    def _idx(self, input_order, output_order, mode):
-        if abs(mode) > input_order:
-            raise IndexError(f'Mode {mode} is out of bounds for input order {input_order}')
-        if abs(mode) > output_order:
-            raise IndexError(f'Mode {mode} is out of bounds for output order {output_order}')
-        if input_order > self.input_order:
-            raise IndexError(f'Input order {input_order} is out of bounds for {self.__class__.__name__} with max input order {self.input_order}')
-        if output_order > self.output_order:
-            raise IndexError(f'Input order {output_order} is out of bounds for {self.__class__.__name__} with max output order {self.output_order}')
-        if input_order > output_order:
-            raise IndexError(f'Component {(input_order, output_order, mode)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
-        if mode < 0:
-            raise IndexError(f'Component {(input_order, output_order, mode)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
-        # Data is stored in [mode, input_order, output_order] (m, n, p) order
-        mode_offset = (
-            mode * (self._min_order + 1) * (self._max_order + 1)
-            - (self._max_order + 1) * (mode * (mode - 1)) // 2
-            - mode * (self._min_order * (self._min_order + 1)) // 2
-            + (mode * (mode - 1) * (mode - 2)) // 6
-        )
-        order_offset = (input_order - mode) * (self._max_order + 1) + (mode * (mode - 1) - input_order * (input_order - 1)) // 2
-        return mode_offset + order_offset + output_order - input_order
+    @property
+    def _coefficient_indices(self):
+        out = []
+        for m in range(self._min_order + 1):
+            for n in range(m, self._min_order + 1):
+                for p in range(n, self._max_order + 1):
+                    out.append((n, p, m))
+        return out
+
+    def _idx(self, input_order=None, output_order=None, mode=None, index=None):
+        def mode_offset(m):
+            return (m * (self._min_order + 1) * (self._max_order + 1)
+                    - (self._max_order + 1) * (m * (m - 1)) // 2
+                    - m * (self._min_order * (self._min_order + 1)) // 2
+                    + (m * (m - 1) * (m - 2)) // 6
+                    )
+
+        def input_order_offset(n, m):
+            return (n - m) * (self._max_order + 1) + (m * (m - 1) - n * (n - 1)) // 2
+
+        if index is None:
+            # Default mode, getting the linear index of the component indices
+            if abs(mode) > input_order:
+                raise IndexError(f'Mode {mode} is out of bounds for input order {input_order}')
+            if abs(mode) > output_order:
+                raise IndexError(f'Mode {mode} is out of bounds for output order {output_order}')
+            if input_order > self.input_order:
+                raise IndexError(f'Input order {input_order} is out of bounds for {self.__class__.__name__} with max input order {self.input_order}')
+            if output_order > self.output_order:
+                raise IndexError(f'Input order {output_order} is out of bounds for {self.__class__.__name__} with max output order {self.output_order}')
+            if input_order > output_order:
+                raise IndexError(f'Component {(input_order, output_order, mode)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
+            if mode < 0:
+                raise IndexError(f'Component {(input_order, output_order, mode)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
+            # Data is stored in [mode, input_order, output_order] (m, n, p) order
+            return mode_offset(mode) + input_order_offset(input_order, mode) + output_order - input_order
+        else:
+            # Inverse mode, getting the component indices of a linear index.
+            mode = 0
+            while mode_offset(mode + 1) <= index:
+                mode += 1
+            index -= mode_offset(mode)
+            input_order = mode
+            while input_order_offset(input_order + 1, mode) <= index:
+                input_order += 1
+            index -= input_order_offset(input_order, mode)
+            output_order = index + input_order
+            return (input_order, output_order, mode)
 
     def __getitem__(self, key):
         n, p, m = key

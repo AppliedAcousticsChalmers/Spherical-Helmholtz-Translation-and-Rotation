@@ -42,36 +42,47 @@ class AssociatedLegendrePolynomials:
                     * self._data[self._idx(order, mode + 1)] * x
                 )
 
-    def _idx(self, order, mode):
-        # TODO: Should these checks be in the getter? That would simplify this function for internal use. Thinking of cython with nogil.
-        if order < 0 or order > self.order:
-            raise IndexError(f'Order {order} is out of bounds for {self.__class__.__name__} with max order {self.order}')
-        if abs(mode) > order:
-            raise IndexError(f'Mode {mode} is out of bounds for order {order}')
-        return order * (order + 1) // 2 + abs(mode)
+    def _idx(self, order=None, mode=None, index=None):
+        if index is None:
+            # Default mode, getting the linear index from the order and mode
+            if mode < 0:
+                raise IndexError(f'Mode {mode} not stored in {self.__class__.__name__}. Use getter or index the object directly')
+            if order < 0 or order > self.order:
+                raise IndexError(f'Order {order} is out of bounds for {self.__class__.__name__} with max order {self.order}')
+            if mode > order:
+                raise IndexError(f'Mode {mode} is out of bounds for order {order}')
+            return order * (order + 1) // 2 + mode
+        else:
+            order = int((8 * index + 1)**0.5 - 1) // 2
+            mode = index - order * (order + 1) // 2
+            return (order, mode)
+
+    @property
+    def _component_indices(self):
+        out = []
+        for order in range(self.order + 1):
+            for mode in range(order + 1):
+                out.append((order, mode))
+        return out
 
     def __getitem__(self, key):
         order, mode = key
+        if mode < 0:
+            sign = (-1) ** mode
+            mode = -mode
+        else:
+            sign = 1
         value = self._data[self._idx(order, mode)]
         if 'complement' in self.normalization.lower():
-            if mode < 0:
-                return value * (-1) ** mode
-            else:
-                return value.copy()  # Copy to make sure that it's not possible to modify the internal array in place.
+            return value * sign
         if 'orthonormal' in self.normalization.lower():
             norm = (1 - self._x**2) ** (abs(mode) / 2)
-            if mode < 0:
-                return value * (-1)**mode * norm
-            else:
-                return value * norm
+            return value * norm * sign
         if 'scipy' in self.normalization.lower():
             numer = 2 * scipy.special.factorial(order + mode)
             denom = scipy.special.factorial(order - mode) * (2 * order + 1)
             norm = (1 - self._x**2) ** (abs(mode) / 2) * (numer / denom) ** 0.5
-            if mode < 0:
-                return value * (-1)**mode * norm
-            else:
-                return value * norm
+            return value * norm * sign
 
 
 class SphericalBessel:

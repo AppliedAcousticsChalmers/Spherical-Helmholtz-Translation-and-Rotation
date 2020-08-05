@@ -27,12 +27,30 @@ class Expansion:
     def wavenumber(self):
         return self._wavenumber
 
-    def _idx(self, order, mode):
-        if order > self.order:
-            raise IndexError(f'Order {order} out of bounds for {self.__class__.__name__} with max order {self.order}')
-        if abs(mode) > order:
-            raise IndexError(f'Mode {mode} out of bounds for order {order}')
-        return order ** 2 + mode
+    def _idx(self, order=None, mode=None, index=None):
+        if index is None:
+            # The default mode, getitng the linear index from the order and mode.
+            if order > self.order:
+                raise IndexError(f'Order {order} out of bounds for {self.__class__.__name__} with max order {self.order}')
+            if abs(mode) > order:
+                raise IndexError(f'Mode {mode} out of bounds for order {order}')
+            return order ** 2 + mode
+        else:
+            # The inverse mode, getting the order and mode from the linear index.
+            if index >= (self.order + 1)**2 or index < 0:
+                raise IndexError(f'Index {index} out of bounds for {self.__class__.__name__} with max order {self.order}')
+            order = int(index ** 0.5)
+            mode = index - order * (order + 1)
+            return (order, mode)
+
+    @property
+    def _coefficient_indices(self):
+        out = []
+        for n in range(self.order + 1):
+            for m in range(-n, n + 1):
+                out.append((n, m))
+        return out
+
 
     def __getitem__(self, key):
         n, m, = key
