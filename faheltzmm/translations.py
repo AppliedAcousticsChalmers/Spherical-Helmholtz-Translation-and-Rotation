@@ -16,6 +16,9 @@ class CoaxialTranslation:
         )
         self._data = np.zeros((num_unique,) + self._shape, self._dtype)
 
+        if distance is not None:
+            self.evaluate(distance=distance, wavenumber=wavenumber)
+
     @property
     def order(self):
         return (self.input_order, self.output_order)
@@ -88,17 +91,109 @@ class CoaxialTranslation:
         else:
             return self._data[self._idx(n, p, abs(m))]
 
+    def evaluate(self, distance, wavenumber):
+        # The computation is split in two domains for p, the stored and the buffered.
+        # The stored range is p <= P, i.e. the values we are interested in.
+        # The buffered range is P < p <= N + P - m, which are values needed to
+        # complete the recurrence to higher n and m.
+        # The values (n, P, m) exist in both ranges, due to simplifications of
+        # the indexing and implementations for the buffered values.
+
+        # We can get away with only two buffers for n since we need (n-1, p, m)
+        # only when calculating (n, p, m), and never again after that point.
+        # By calculating and storing in the same statement, we can reuse the same memory directly.
+
+        # Recurrence buffers
+        N, P = self._min_order, self._max_order  # Shorthand for clarity
+        m_buffer = np.zeros((N + 1,) + self.shape, dtype=self._dtype)
+        m_minus_one_buffer = np.zeros((N + 1,) + self.shape, dtype=self._dtype)
+        n_minus_two_buffer = np.zeros((N + 1,) + self.shape, dtype=self._dtype)
+        n_minus_one_buffer = np.zeros((N + 1,) + self.shape, dtype=self._dtype)
+
+        for m in range(N + 1):  # Main loop over modes
+            # Buffer swap for sectorials.
+            m_buffer, m_minus_one_buffer = m_minus_one_buffer, m_buffer
+            if m == 0:  # Get starting values: (0, p, 0)
+                # Somewhat ugly with this if-statement inside the loop,
+                # but the alternative is to duplicate everything else in the loop
+                # for m=0.
+                initial_values = self._recurrence_initialization(order=N + P, x=distance * wavenumber)
+                for p in range(P):
+                    self._data[self._idx(0, p, 0)] = initial_values[p] * (2 * p + 1)**0.5
+                self._data[self._idx(0, P, 0)] = m_buffer[0] = n_minus_one_buffer[0] = initial_values[P] * (2 * P + 1)**0.5
+                for p in range(P + 1, N + P + 1):
+                    m_buffer[p - P] = n_minus_one_buffer[p - P] = initial_values[p] * (2 * p + 1)**0.5
+            else:
+                for p in range(m, P):  # Sectorial recurrence in the stored range
+                    self._data[self._idx(m, p, m)] = (
+                        self._data[self._idx(m - 1, p - 1, m - 1)] * ((p + m - 1) * (p + m) * (2 * m + 1) / ((2 * p - 1) * (2 * p + 1) * (2 * m)))**0.5
+                        + self._data[self._idx(m - 1, p + 1, m - 1)] * ((p - m + 1) * (p - m + 2) * (2 * m + 1) / ((2 * p + 1) * (2 * p + 3) * (2 * m)))**0.5
+                    )
+                self._data[self._idx(m, P, m)] = m_buffer[0] = n_minus_one_buffer[0] = (
+                    self._data[self._idx(m - 1, P - 1, m - 1)] * ((P + m - 1) * (P + m) * (2 * m + 1) / ((2 * P - 1) * (2 * P + 1) * (2 * m)))**0.5
+                    + m_minus_one_buffer[1] * ((P - m + 1) * (P - m + 2) * (2 * m + 1) / ((2 * P + 1) * (2 * P + 3) * (2 * m)))**0.5
+                )
+
+                for p in range(P + 1, N + P - m + 1):  # Sectorial recurrence in the buffered range
+                    m_buffer[p - P] = n_minus_one_buffer[p - P] = (
+                        m_minus_one_buffer[p - P - 1] * ((p + m - 1) * (p + m) * (2 * m + 1) / ((2 * p - 1) * (2 * p + 1) * (2 * m)))**0.5
+                        + m_minus_one_buffer[p - P + 1] * ((p - m + 1) * (p - m + 2) * (2 * m + 1) / ((2 * p + 1) * (2 * p + 3) * (2 * m)))**0.5
+                    )
+            # Remaining (non-sectorial) values.
+            # n = m + 1 is a special case since n-2 < m removes one component from the recurrence
+            if m < N:  # Needed to prevent n = N + 1
+                scale = (2 * m + 3)**0.5
+                for p in range(m + 1, P):  # n = m - 1, stored range
+                    self._data[self._idx(m + 1, p, m)] = scale * (
+                        self._data[self._idx(m, p - 1, m)] * ((p + m) * (p - m) / ((2 * p - 1) * (2 * p + 1)))**0.5
+                        - self._data[self._idx(m, p + 1, m)] * ((p + m + 1) * (p - m + 1) / ((2 * p + 1) * (2 * p + 3)))**0.5
+                    )
+                self._data[self._idx(m + 1, P, m)] = n_minus_two_buffer[0] = scale * (
+                    self._data[self._idx(m, P - 1, m)] * ((P + m) * (P - m) / ((2 * P - 1) * (2 * P + 1)))**0.5
+                    - n_minus_one_buffer[1] * ((P + m + 1) * (P - m + 1) / ((2 * P + 1) * (2 * P + 3)))**0.5
+                )
+                for p in range(P + 1, N + P - m):  # n = m - 1, buffered range
+                    n_minus_two_buffer[p - P] = scale * (
+                        n_minus_one_buffer[p - P - 1] * ((p + m) * (p - m) / ((2 * p - 1) * (2 * p + 1)))**0.5
+                        - n_minus_one_buffer[p - P + 1] * ((p + m + 1) * (p - m + 1) / ((2 * p + 1) * (2 * p + 3)))**0.5
+                    )
+
+            for n in range(m + 2, N + 1):  # Main loop over n.
+                # Buffer swap for n.
+                n_minus_one_buffer, n_minus_two_buffer = n_minus_two_buffer, n_minus_one_buffer
+                scale = ((2 * n - 1) * (2 * n + 1) / ((n + m) * (n - m)))**0.5
+                for p in range(n, P):  # Stored range
+                    self._data[self._idx(n, p, m)] = scale * (
+                        self._data[self._idx(n - 2, p, m)] * ((n + m - 1) * (n - m - 1) / ((2 * n - 3) * (2 * n - 1)))**0.5
+                        + self._data[self._idx(n - 1, p - 1, m)] * ((p + m) * (p - m) / ((2 * p - 1) * (2 * p + 1)))**0.5
+                        - self._data[self._idx(n - 1, p + 1, m)] * ((p + m + 1) * (p - m + 1) / ((2 * p + 1) * (2 * p + 3)))**0.5
+                    )
+                self._data[self._idx(n, P, m)] = n_minus_two_buffer[0] = scale * (
+                    self._data[self._idx(n - 2, P, m)] * ((n + m - 1) * (n - m - 1) / ((2 * n - 3) * (2 * n - 1)))**0.5
+                    + self._data[self._idx(n - 1, P - 1, m)] * ((P + m) * (P - m) / ((2 * P - 1) * (2 * P + 1)))**0.5
+                    - n_minus_one_buffer[1] * ((P + m + 1) * (P - m + 1) / ((2 * P + 1) * (2 * P + 3)))**0.5
+                )
+                for p in range(P + 1, N + P - n + 1):  # Buffered range
+                    n_minus_two_buffer[p - P] = scale * (
+                        n_minus_two_buffer[p - P] * ((n + m - 1) * (n - m - 1) / ((2 * n - 3) * (2 * n - 1)))**0.5
+                        + n_minus_one_buffer[p - P - 1] * ((p + m) * (p - m) / ((2 * p - 1) * (2 * p + 1)))**0.5
+                        - n_minus_one_buffer[p - P + 1] * ((p + m + 1) * (p - m + 1) / ((2 * p + 1) * (2 * p + 3)))**0.5
+                    )
+
 
 class InteriorCoaxialTranslation(CoaxialTranslation):
     _dtype = float
+    from .bases import SphericalBessel as _recurrence_initialization
 
 
 class ExteriorCoaxialTranslation(CoaxialTranslation):
     _dtype = float
+    from .bases import SphericalBessel as _recurrence_initialization
 
 
 class ExteriorInteriorCoaxialTranslation(CoaxialTranslation):
     _dtype = complex
+    from .bases import SphericalHankel as _recurrence_initialization
 
 
 def translate(field_coefficients, position, wavenumber, input_domain, output_domain, max_output_order=None):
