@@ -29,7 +29,7 @@ class Expansion:
 
     def _idx(self, order=None, mode=None, index=None):
         if index is None:
-            # The default mode, getitng the linear index from the order and mode.
+            # The default mode, getting the linear index from the order and mode.
             if order > self.order:
                 raise IndexError(f'Order {order} out of bounds for {self.__class__.__name__} with max order {self.order}')
             if abs(mode) > order:
@@ -50,7 +50,6 @@ class Expansion:
             for m in range(-n, n + 1):
                 out.append((n, m))
         return out
-
 
     def __getitem__(self, key):
         n, m, = key

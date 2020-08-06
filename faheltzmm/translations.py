@@ -1,8 +1,10 @@
 import numpy as np
-from . import generate, coordinates, rotations
+from . import generate, coordinates, rotations, expansions
 
 
 class CoaxialTranslation:
+    _default_output_type = expansions.Expansion
+
     def __init__(self, input_order, output_order, distance=None, wavenumber=None, shape=None):
         self._input_order = input_order
         self._output_order = output_order
@@ -179,6 +181,28 @@ class CoaxialTranslation:
                         + n_minus_one_buffer[p - P - 1] * ((p + m) * (p - m) / ((2 * p - 1) * (2 * p + 1)))**0.5
                         - n_minus_one_buffer[p - P + 1] * ((p + m + 1) * (p - m + 1) / ((2 * p + 1) * (2 * p + 3)))**0.5
                     )
+
+    def apply(self, expansion, inverse=False, out=None):
+        if out is None:
+            shape = np.broadcast(self[0, 0, 0], expansion[0, 0]).shape
+            out = self._default_output_type(order=self.input_order if inverse else self.output_order, wavenumber=expansion.wavenumber, shape=shape)
+        elif expansion is out:
+            raise NotImplementedError('Translations cannot currently be applied in place')
+        if not inverse:
+            for m in range(-self._min_order, self._min_order + 1):
+                for p in range(abs(m), self.output_order + 1):
+                    value = 0
+                    for n in range(abs(m), self.input_order + 1):
+                        value += self[n, p, m] * expansion[n, m]
+                    out[p, m] = value
+        else:
+            for m in range(-self._min_order, self._min_order + 1):
+                for n in range(abs(m), self.input_order + 1):
+                    value = 0
+                    for p in range(abs(m), self.output_order + 1):
+                        value += self[n, p, m] * expansion[p, m]
+                    out[n, m] = value
+        return out
 
 
 class InteriorCoaxialTranslation(CoaxialTranslation):
