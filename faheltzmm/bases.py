@@ -69,10 +69,9 @@ class AssociatedLegendrePolynomials:
         order, mode = key
         if mode < 0:
             sign = (-1) ** mode
-            mode = -mode
         else:
             sign = 1
-        value = self._data[self._idx(order, mode)]
+        value = self._data[self._idx(order, abs(mode))]
         if 'complement' in self.normalization.lower():
             return value * sign
         if 'orthonormal' in self.normalization.lower():
@@ -119,8 +118,8 @@ class DualSphericalBessel(SphericalBessel):
     def evaluate(self, x):
         order = np.arange(self.order + 1).reshape([-1] + [1] * len(self.shape))
         bessel = scipy.special.spherical_jn(order, x, derivative=False)
-        hankel = scipy.special.spherical_yn(order, x, derivative=False)
-        self._data = np.stack([bessel, bessel + 1j * hankel], axis=1)
+        neumann = scipy.special.spherical_yn(order, x, derivative=False)
+        self._data = np.stack([bessel, bessel + 1j * neumann], axis=1)
 
 
 class SphericalHarmonics:
