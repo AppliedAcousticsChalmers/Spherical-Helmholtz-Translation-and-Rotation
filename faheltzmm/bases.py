@@ -83,6 +83,13 @@ class AssociatedLegendrePolynomials:
             norm = (1 - self._x**2) ** (abs(mode) / 2) * (numer / denom) ** 0.5
             return value * norm * sign
 
+    def apply(self, expansion):
+        value = 0
+        for n in range(self.order + 1):
+            for m in range(-n, n + 1):
+                value += self[n, m] * expansion[n, m]
+        return value
+
 
 class SphericalBessel:
     def __init__(self, order, x=None, shape=None):
@@ -134,6 +141,13 @@ class SphericalHarmonics:
         self._legendre.evaluate(cosine_colatitude)
         self._azimuth = azimuth if np.iscomplexobj(azimuth) else np.exp(1j * azimuth)
 
+    def apply(self, expansion):
+        value = 0
+        for n in range(self.order + 1):
+            for m in range(-n, n + 1):
+                value += self[n, m] * expansion[n, m]
+        return value
+
     def __getitem__(self, key):
         order, mode = key
         return self._legendre[order, mode] * self._azimuth ** mode / (2 * np.pi)**0.5
@@ -173,6 +187,12 @@ class SphericalBase:
         order, mode = key
         return self._radial[order] * self._angular[order, mode]
 
+    def apply(self, expansion):
+        value = 0
+        for n in range(self.order + 1):
+            for m in range(-n, n + 1):
+                value += self[n, m] * expansion[n, m]
+        return value
 
 class RegularBase(SphericalBase):
     _radial_cls = SphericalBessel
