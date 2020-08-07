@@ -79,10 +79,11 @@ class ColatitudeRotation:
 
         # n=0 and n=1 will be special cases since the p=n-1 and p=n special cases will not behave
         self._data[self._idx(0, 0, 0)] = 1
-        self._data[self._idx(1, 0, 0)] = cosine_colatitude
-        self._data[self._idx(1, 1, -1)] = (1 - cosine_colatitude) * 0.5
-        self._data[self._idx(1, 1, 0)] = sine_colatitude * 2**-0.5
-        self._data[self._idx(1, 1, 1)] = (1 + cosine_colatitude) * 0.5
+        if self.order > 0:
+            self._data[self._idx(1, 0, 0)] = cosine_colatitude
+            self._data[self._idx(1, 1, -1)] = (1 - cosine_colatitude) * 0.5
+            self._data[self._idx(1, 1, 0)] = sine_colatitude * 2**-0.5
+            self._data[self._idx(1, 1, 1)] = (1 + cosine_colatitude) * 0.5
 
         for n in range(2, self.order + 1):
             for p in range(0, n - 1):
