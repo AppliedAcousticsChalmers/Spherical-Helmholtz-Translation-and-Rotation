@@ -34,7 +34,7 @@ class Expansion:
                 raise IndexError(f'Order {order} out of bounds for {self.__class__.__name__} with max order {self.order}')
             if abs(mode) > order:
                 raise IndexError(f'Mode {mode} out of bounds for order {order}')
-            return order ** 2 + mode
+            return order ** 2 + order + mode
         else:
             # The inverse mode, getting the order and mode from the linear index.
             if index >= (self.order + 1)**2 or index < 0:
