@@ -63,10 +63,10 @@ class CoaxialTranslation:
                 raise IndexError(f'Mode {mode} is out of bounds for input order {input_order}')
             if abs(mode) > output_order:
                 raise IndexError(f'Mode {mode} is out of bounds for output order {output_order}')
-            if input_order > self.input_order:
-                raise IndexError(f'Input order {input_order} is out of bounds for {self.__class__.__name__} with max input order {self.input_order}')
-            if output_order > self.output_order:
-                raise IndexError(f'Input order {output_order} is out of bounds for {self.__class__.__name__} with max output order {self.output_order}')
+            if input_order > self._min_order:
+                raise IndexError(f'Component {(input_order, output_order, mode)} not stored in {self.__class__.__name__} (n > min(N, P). Use getter or index the object directly.')
+            if output_order > self._max_order:
+                raise IndexError(f'Component {(input_order, output_order, mode)} not stored in {self.__class__.__name__} (p > max(N, P)). Use getter or index the object directly.')
             if input_order > output_order:
                 raise IndexError(f'Component {(input_order, output_order, mode)} not stored in {self.__class__.__name__}. Use getter or index the object directly.')
             if mode < 0:
@@ -98,10 +98,10 @@ class CoaxialTranslation:
         # The stored range is p <= P, i.e. the values we are interested in.
         # The buffered range is P < p <= N + P - m, which are values needed to
         # complete the recurrence to higher n and m.
-        # The values (n, P, m) exist in both ranges, due to simplifications of
+        # The values (n, P, m) exist in both domains, due to simplifications of
         # the indexing and implementations for the buffered values.
 
-        # We can get away with only two buffers for n since we need (n-1, p, m)
+        # We can get away with only two buffers for n since we need (n-2, p, m)
         # only when calculating (n, p, m), and never again after that point.
         # By calculating and storing in the same statement, we can reuse the same memory directly.
 
