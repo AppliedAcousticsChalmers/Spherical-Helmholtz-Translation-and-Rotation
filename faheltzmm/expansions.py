@@ -105,3 +105,7 @@ class Expansion:
 
     def __neg__(self):
         return type(self)(data=-self._data, wavenumber=self.wavenumber)
+
+    def apply(self, transform, *args, **kwargs):
+        return transform.apply(self, *args, **kwargs)
+
