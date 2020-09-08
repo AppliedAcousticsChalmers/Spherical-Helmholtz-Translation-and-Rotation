@@ -144,14 +144,14 @@ class DualRadialBase(_RadialBaseClass):
 
 
 class SphericalHarmonics:
-    def __init__(self, order, colatitude=None, azimuth=None, cosine_colatitude=None, shape=None):
-        shape = shape if shape is not None else np.broadcast(cosine_colatitude if cosine_colatitude is not None else colatitude, azimuth).shape
+    def __init__(self, order, colatitude=None, azimuth=None, shape=None):
+        shape = shape if shape is not None else np.broadcast(colatitude, azimuth).shape
         self._legendre = AssociatedLegendrePolynomials(order, shape=shape, normalization='orthonormal')
         if azimuth is not None:
-            self.evaluate(colatitude=colatitude, azimuth=azimuth, cosine_colatitude=cosine_colatitude)
+            self.evaluate(colatitude=colatitude, azimuth=azimuth)
 
-    def evaluate(self, colatitude=None, azimuth=None, cosine_colatitude=None):
-        cosine_colatitude = np.cos(colatitude) if cosine_colatitude is None else cosine_colatitude
+    def evaluate(self, colatitude=None, azimuth=None):
+        cosine_colatitude = np.cos(colatitude)
         self._legendre.evaluate(cosine_colatitude)
         self._azimuth = azimuth if np.iscomplexobj(azimuth) else np.exp(1j * azimuth)
         return self
@@ -184,10 +184,10 @@ class SphericalBase:
         if position is not None:
             self.evaluate(position, wavenumber)
 
-    def evaluate(self, position, wavenumber):
-        r, cos_theta, _, cos_phi, sin_phi = coordinates.cartesian_2_trigonometric(position)
-        self._radial.evaluate(r, wavenumber)
-        self._angular.evaluate(cosine_colatitude=cos_theta, azimuth=cos_phi + 1j * sin_phi)
+    def evaluate(self, position=None, wavenumber=None, radius=None, colatitude=None, azimuth=None):
+        radius, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
+        self._radial.evaluate(radius, wavenumber)
+        self._angular.evaluate(colatitude=colatitude, azimuth=azimuth)
         return self
 
     @property

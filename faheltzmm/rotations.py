@@ -72,9 +72,9 @@ class ColatitudeRotation:
             sign = 1
         return sign * self._data[self._idx(n, p, m)]
 
-    def evaluate(self, colatitude=None, cosine_colatitude=None, sine_colatitude=None):
-        cosine_colatitude = np.cos(colatitude) if cosine_colatitude is None else np.asarray(cosine_colatitude)
-        sine_colatitude = (1 - cosine_colatitude**2)**0.5 if sine_colatitude is None else np.asarray(sine_colatitude)
+    def evaluate(self, colatitude=None):
+        cosine_colatitude = np.cos(colatitude)
+        sine_colatitude = (1 - cosine_colatitude**2)**0.5
 
         legendre = bases.AssociatedLegendrePolynomials(order=self.order, x=cosine_colatitude)
 
