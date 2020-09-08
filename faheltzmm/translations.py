@@ -220,6 +220,44 @@ class ExteriorInteriorCoaxialTranslation(CoaxialTranslation):
     from .bases import SphericalHankel as _recurrence_initialization
 
 
+class Translation:
+    def __init__(self, input_order, output_order, position=None, wavenumber=None, shape=None):
+        self._coaxial = self._coaxial_cls(
+            input_order=input_order, output_order=output_order,
+            shape=shape if shape is not None else np.broadcast(position[0], wavenumber).shape
+        )
+        self._rotation = rotations.Rotation(
+            order=max(input_order, output_order),
+            shape=shape if shape is not None else np.shape(position[0])
+        )
+
+        if position is not None:
+            self.evaluate(position, wavenumber)
+
+    def evaluate(self, position, wavenumber):
+        r, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
+        self._coaxial.evaluate(distance=r, wavenumber=wavenumber)
+        self._rotation.evaluate(colatitude=colatitude, primary_azimuth=azimuth)
+
+    def apply(self, expansion, inverse=False):
+        if not inverse:
+            return expansion.apply(self._rotation).apply(self._coaxial).apply(self._rotation, inverse=True)
+        else:
+            raise NotImplementedError('Inverse translations not currently implemented.')
+
+
+class InteriorTranslation(Translation):
+    _coaxial_cls = InteriorCoaxialTranslation
+
+
+class ExteriorTranslation(Translation):
+    _coaxial_cls = ExteriorCoaxialTranslation
+
+
+class ExteriorInteriorTranslation(Translation):
+    _coaxial_cls = ExteriorInteriorCoaxialTranslation
+
+
 def translate(field_coefficients, position, wavenumber, input_domain, output_domain, max_output_order=None):
     # TODO: Merge this with the translation function.
     t, beta, alpha = coordinates.cartesian_2_spherical(position)
