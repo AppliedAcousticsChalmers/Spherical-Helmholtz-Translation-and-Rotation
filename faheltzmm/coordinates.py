@@ -59,7 +59,7 @@ def cartesian_2_trigonometric(cartesian_positions):
     cos_theta = np.clip(normalized[2], -1, 1)
     sin_theta = (1 - cos_theta**2)**0.5
     with np.errstate(divide='ignore', invalid='ignore'):
-        xy_projected = np.where(sin_theta == 0, 0, normalized[:2] / sin_theta)
+        xy_projected = np.where(sin_theta * r == 0, np.reshape([1, 0], [2] + [1] * np.ndim(sin_theta)), normalized[:2] / sin_theta)
     cos_phi = np.clip(xy_projected[0], -1, 1)
     sin_phi = np.clip(xy_projected[1], -1, 1)
     return np.stack([r, cos_theta, sin_theta, cos_phi, sin_phi], axis=0)
