@@ -92,17 +92,22 @@ class AssociatedLegendrePolynomials:
         return value
 
 
-class SphericalBessel:
-    def __init__(self, order, x=None, shape=None):
+class _RadialBaseClass:
+    def __init__(self, order, radius=None, wavenumber=None, shape=None):
         self._order = order
-        self._shape = shape if shape is not None else np.shape(x)
+        self._shape = shape if shape is not None else np.shape(radius)
 
-        if x is not None:
-            self.evaluate(x)
+        if radius is not None:
+            self.evaluate(radius, wavenumber)
 
-    def evaluate(self, x):
-        order = np.arange(self.order + 1).reshape([-1] + [1] * len(self.shape))
-        self._data = scipy.special.spherical_jn(order, x, derivative=False)
+    def evaluate(self, radius, wavenumber=None):
+        self._wavenumber = wavenumber
+        if wavenumber is not None:
+            x = radius * np.reshape(wavenumber, np.shape(wavenumber) + (1,) * np.ndim(radius))
+        else:
+            x = radius
+        order = np.arange(self.order + 1).reshape((-1,) + (1,) * (np.ndim(self.wavenumber) + len(self.shape)))
+        self._data = self._radial_func(order, x)
         return self
 
     @property
@@ -116,21 +121,26 @@ class SphericalBessel:
     def __getitem__(self, key):
         return self._data[key]
 
-
-class SphericalHankel(SphericalBessel):
-    def evaluate(self, x):
-        order = np.arange(self.order + 1).reshape([-1] + [1] * len(self.shape))
-        self._data = scipy.special.spherical_jn(order, x, derivative=False) + 1j * scipy.special.spherical_yn(order, x, derivative=False)
-        return self
+    @property
+    def wavenumber(self):
+        return self._wavenumber
 
 
-class DualSphericalBessel(SphericalBessel):
-    def evaluate(self, x):
-        order = np.arange(self.order + 1).reshape([-1] + [1] * len(self.shape))
+class RegularRadialBase(_RadialBaseClass):
+    def _radial_func(self, order, x):
+        return scipy.special.spherical_jn(order, x, derivative=False)
+
+
+class SingularRadialBase(_RadialBaseClass):
+    def _radial_func(self, order, x):
+        return scipy.special.spherical_jn(order, x, derivative=False) + 1j * scipy.special.spherical_yn(order, x, derivative=False)
+
+
+class DualRadialBase(_RadialBaseClass):
+    def _radial_func(self, order, x):
         bessel = scipy.special.spherical_jn(order, x, derivative=False)
         neumann = scipy.special.spherical_yn(order, x, derivative=False)
-        self._data = np.stack([bessel, bessel + 1j * neumann], axis=1)
-        return self
+        return np.stack([bessel, bessel + 1j * neumann], axis=1)
 
 
 class SphericalHarmonics:
@@ -168,7 +178,7 @@ class SphericalHarmonics:
 
 class SphericalBase:
     def __init__(self, order, position=None, wavenumber=None, shape=None):
-        shape = shape if shape is not None else np.shape(wavenumber) + np.shape(position)[1:]
+        shape = shape if shape is not None else np.shape(position)[1:]
         self._angular = SphericalHarmonics(order=order, shape=shape)
         self._radial = self._radial_cls(order=order, shape=shape)
         if position is not None:
@@ -176,8 +186,7 @@ class SphericalBase:
 
     def evaluate(self, position, wavenumber):
         r, cos_theta, _, cos_phi, sin_phi = coordinates.cartesian_2_trigonometric(position)
-        kr = r * np.reshape(wavenumber, np.shape(wavenumber) + (1,) * np.ndim(r))
-        self._radial.evaluate(kr)
+        self._radial.evaluate(r, wavenumber)
         self._angular.evaluate(cosine_colatitude=cos_theta, azimuth=cos_phi + 1j * sin_phi)
         return self
 
@@ -188,6 +197,10 @@ class SphericalBase:
     @property
     def shape(self):
         return self._angular.shape
+
+    @property
+    def wavenumber(self):
+        return self._radial.wavenumber
 
     def __getitem__(self, key):
         order, mode = key
@@ -202,15 +215,15 @@ class SphericalBase:
 
 
 class RegularBase(SphericalBase):
-    _radial_cls = SphericalBessel
+    _radial_cls = RegularRadialBase
 
 
 class SingularBase(SphericalBase):
-    _radial_cls = SphericalHankel
+    _radial_cls = SingularRadialBase
 
 
 class DualBase(SphericalBase):
-    _radial_cls = DualSphericalBessel
+    _radial_cls = DualRadialBase
 
     class _Regular:
         def __init__(self, parent):

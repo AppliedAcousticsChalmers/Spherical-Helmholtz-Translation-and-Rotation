@@ -208,17 +208,17 @@ class CoaxialTranslation:
 
 class InteriorCoaxialTranslation(CoaxialTranslation):
     _dtype = float
-    from .bases import SphericalBessel as _recurrence_initialization
+    from .bases import RegularRadialBase as _recurrence_initialization
 
 
 class ExteriorCoaxialTranslation(CoaxialTranslation):
     _dtype = float
-    from .bases import SphericalBessel as _recurrence_initialization
+    from .bases import RegularRadialBase as _recurrence_initialization
 
 
 class ExteriorInteriorCoaxialTranslation(CoaxialTranslation):
     _dtype = complex
-    from .bases import SphericalHankel as _recurrence_initialization
+    from .bases import SingularRadialBase as _recurrence_initialization
 
 
 class Translation:
