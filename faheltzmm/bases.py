@@ -189,10 +189,11 @@ class SphericalBase:
 
     def apply(self, expansion):
         value = 0
-        for n in range(self.order + 1):
+        for n in range(min(self.order, expansion.order) + 1):
             for m in range(-n, n + 1):
                 value += self[n, m] * expansion[n, m]
         return value
+
 
 class RegularBase(SphericalBase):
     _radial_cls = SphericalBessel

@@ -139,9 +139,9 @@ class ColatitudeRotation:
                 out = expansions.Expansion(order=self.order, shape=shape)
         elif expansion is out:
             raise NotImplementedError('Rotations cannot currently be applied in place')
-        # TODO: Check that the order matches?
+        N = min(self.order, expansion.order)  # Allows the rotation coefficients to be used for lower order expansions
         if not inverse:
-            for n in range(self.order + 1):
+            for n in range(N + 1):
                 for p in range(-n, n + 1):
                     # Use a local temporary variable to accumulate the summed value.
                     # We might not always be able to add in place to the components of the output.
@@ -150,7 +150,7 @@ class ColatitudeRotation:
                         value += expansion[n, m] * self[n, p, m]
                     out[n, p] = value
         else:
-            for n in range(self.order + 1):
+            for n in range(N + 1):
                 for m in range(-n, n + 1):
                     value = 0
                     for p in range(-n, n + 1):
