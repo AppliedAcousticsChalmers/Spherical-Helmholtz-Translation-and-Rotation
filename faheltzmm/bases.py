@@ -7,9 +7,8 @@ class AssociatedLegendrePolynomials:
     def __init__(self, order, x=None, shape=None, normalization='orthonormal'):
         self._order = order
         self.normalization = normalization
-        self._shape = shape if shape is not None else np.shape(x)
         num_unique = (self.order + 1) * (self.order + 2) // 2
-        self._data = np.zeros((num_unique,) + self.shape, dtype=float)
+        self._data = np.zeros((num_unique,) + (shape if shape is not None else np.shape(x)), dtype=float)
 
         if x is not None:
             self.evaluate(x)
@@ -20,7 +19,7 @@ class AssociatedLegendrePolynomials:
 
     @property
     def shape(self):
-        return self._shape
+        return self._data.shape[1:]
 
     def evaluate(self, x):
         self._x = x = np.asarray(x)
@@ -96,16 +95,19 @@ class _RadialBaseClass:
     def __init__(self, order, radius=None, wavenumber=None, shape=None):
         self._order = order
         self._shape = shape if shape is not None else np.shape(radius)
+        self._wavenumber = wavenumber
 
         if radius is not None:
             self.evaluate(radius, wavenumber)
 
     def evaluate(self, radius, wavenumber=None):
-        self._wavenumber = wavenumber
         if wavenumber is not None:
-            x = radius * np.reshape(wavenumber, np.shape(wavenumber) + (1,) * np.ndim(radius))
-        else:
+            self._wavenumber = wavenumber
+        if self.wavenumber is None:
             x = radius
+        else:
+            x = radius * np.reshape(wavenumber, np.shape(wavenumber) + (1,) * np.ndim(radius))
+
         order = np.arange(self.order + 1).reshape((-1,) + (1,) * (np.ndim(self.wavenumber) + len(self.shape)))
         self._data = self._radial_func(order, x)
         return self
@@ -146,7 +148,7 @@ class DualRadialBase(_RadialBaseClass):
 class SphericalHarmonics:
     def __init__(self, order, colatitude=None, azimuth=None, shape=None):
         shape = shape if shape is not None else np.broadcast(colatitude, azimuth).shape
-        self._legendre = AssociatedLegendrePolynomials(order, shape=shape, normalization='orthonormal')
+        self._legendre = AssociatedLegendrePolynomials(order, shape=shape if shape is not None else np.shape(colatitude), normalization='orthonormal')
         if azimuth is not None:
             self.evaluate(colatitude=colatitude, azimuth=azimuth)
 
@@ -173,19 +175,30 @@ class SphericalHarmonics:
 
     @property
     def shape(self):
-        return self._legendre.shape
+        return np.broadcast(self._legendre._data[0], self._azimuth).shape
 
 
 class SphericalBase:
-    def __init__(self, order, position=None, wavenumber=None, shape=None):
-        shape = shape if shape is not None else np.shape(position)[1:]
-        self._angular = SphericalHarmonics(order=order, shape=shape)
-        self._radial = self._radial_cls(order=order, shape=shape)
-        if position is not None:
-            self.evaluate(position, wavenumber)
+    def __init__(self, order, position=None, wavenumber=None,
+                 radius=None, colatitude=None, azimuth=None, shape=None):
+        if shape is not None:
+            radial_shape = shape
+            angular_shape = shape
+        elif position is not None:
+            radial_shape = np.shape(position)[1:]
+            angular_shape = np.shape(position)[1:]
+        else:
+            angular_shape = np.broadcast(colatitude, azimuth).shape
+            radial_shape = np.shape(radius)
+
+        self._angular = SphericalHarmonics(order=order, shape=angular_shape)
+        self._radial = self._radial_cls(order=order, shape=radial_shape)
+        if position is not None or radius is not None:
+            self.evaluate(position=position, wavenumber=wavenumber, radius=radius, colatitude=colatitude, azimuth=azimuth)
 
     def evaluate(self, position=None, wavenumber=None, radius=None, colatitude=None, azimuth=None):
-        radius, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
+        if position is not None:
+            radius, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
         self._radial.evaluate(radius, wavenumber)
         self._angular.evaluate(colatitude=colatitude, azimuth=azimuth)
         return self
@@ -196,7 +209,9 @@ class SphericalBase:
 
     @property
     def shape(self):
-        return self._angular.shape
+        radial = np.empty(self._radial.shape, dtype=[])
+        angular = np.empty(self._angular.shape, dtype=[])
+        return np.broadcast(radial, angular).shape
 
     @property
     def wavenumber(self):
