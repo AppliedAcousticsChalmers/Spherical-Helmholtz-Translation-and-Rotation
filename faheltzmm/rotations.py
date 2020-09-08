@@ -129,6 +129,7 @@ class ColatitudeRotation:
                 self._data[self._idx(n, n, m)] = (
                     self._data[self._idx(n - 1, n - 1, m - 1)] * 0.5 * (1 + cosine_colatitude) * ((2 * n - 1) * 2 * n)**0.5
                 ) / ((n + m - 1) * (n + m))**0.5
+        return self
 
     def apply(self, expansion, inverse=False, out=None):
         if out is None:
@@ -186,6 +187,7 @@ class Rotation(ColatitudeRotation):
             super().evaluate(colatitude=colatitude, **kwargs)
         self._primary_phase = np.exp(1j * primary_azimuth)
         self._secondary_phase = np.exp(1j * secondary_azimuth)
+        return self
 
     @property
     def shape(self):

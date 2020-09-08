@@ -41,6 +41,7 @@ class AssociatedLegendrePolynomials:
                     + 2 * (mode + 1) / ((order + mode + 1) * (order - mode))**0.5
                     * self._data[self._idx(order, mode + 1)] * x
                 )
+        return self
 
     def _idx(self, order=None, mode=None, index=None):
         if index is None:
@@ -102,6 +103,7 @@ class SphericalBessel:
     def evaluate(self, x):
         order = np.arange(self.order + 1).reshape([-1] + [1] * len(self.shape))
         self._data = scipy.special.spherical_jn(order, x, derivative=False)
+        return self
 
     @property
     def order(self):
@@ -119,6 +121,7 @@ class SphericalHankel(SphericalBessel):
     def evaluate(self, x):
         order = np.arange(self.order + 1).reshape([-1] + [1] * len(self.shape))
         self._data = scipy.special.spherical_jn(order, x, derivative=False) + 1j * scipy.special.spherical_yn(order, x, derivative=False)
+        return self
 
 
 class DualSphericalBessel(SphericalBessel):
@@ -127,6 +130,7 @@ class DualSphericalBessel(SphericalBessel):
         bessel = scipy.special.spherical_jn(order, x, derivative=False)
         neumann = scipy.special.spherical_yn(order, x, derivative=False)
         self._data = np.stack([bessel, bessel + 1j * neumann], axis=1)
+        return self
 
 
 class SphericalHarmonics:
@@ -140,6 +144,7 @@ class SphericalHarmonics:
         cosine_colatitude = np.cos(colatitude) if cosine_colatitude is None else cosine_colatitude
         self._legendre.evaluate(cosine_colatitude)
         self._azimuth = azimuth if np.iscomplexobj(azimuth) else np.exp(1j * azimuth)
+        return self
 
     def apply(self, expansion):
         value = 0
@@ -174,6 +179,7 @@ class SphericalBase:
         kr = r * np.reshape(wavenumber, np.shape(wavenumber) + (1,) * np.ndim(r))
         self._radial.evaluate(kr)
         self._angular.evaluate(cosine_colatitude=cos_theta, azimuth=cos_phi + 1j * sin_phi)
+        return self
 
     @property
     def order(self):

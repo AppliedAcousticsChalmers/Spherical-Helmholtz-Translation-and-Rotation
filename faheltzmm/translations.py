@@ -181,6 +181,7 @@ class CoaxialTranslation:
                         + n_minus_one_buffer[p - P - 1] * ((p + m) * (p - m) / ((2 * p - 1) * (2 * p + 1)))**0.5
                         - n_minus_one_buffer[p - P + 1] * ((p + m + 1) * (p - m + 1) / ((2 * p + 1) * (2 * p + 3)))**0.5
                     )
+        return self
 
     def apply(self, expansion, inverse=False, out=None):
         if out is None:
@@ -238,6 +239,7 @@ class Translation:
         r, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
         self._coaxial.evaluate(distance=r, wavenumber=wavenumber)
         self._rotation.evaluate(colatitude=colatitude, primary_azimuth=azimuth)
+        return self
 
     def apply(self, expansion, inverse=False):
         if not inverse:
