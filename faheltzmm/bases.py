@@ -1,16 +1,17 @@
 import numpy as np
 import scipy.special
 from . import coordinates
+from . import _is_value
 
 
 class AssociatedLegendrePolynomials:
-    def __init__(self, order, x=None, shape=None, normalization='orthonormal'):
+    def __init__(self, order, x=None, normalization='orthonormal'):
         self._order = order
         self.normalization = normalization
         num_unique = (self.order + 1) * (self.order + 2) // 2
-        self._data = np.zeros((num_unique,) + (shape if shape is not None else np.shape(x)), dtype=float)
+        self._data = np.zeros((num_unique,) + np.shape(x), dtype=float)
 
-        if x is not None:
+        if _is_value(x):
             self.evaluate(x)
 
     @property
@@ -92,12 +93,12 @@ class AssociatedLegendrePolynomials:
 
 
 class _RadialBaseClass:
-    def __init__(self, order, radius=None, wavenumber=None, shape=None):
+    def __init__(self, order, radius=None, wavenumber=None):
         self._order = order
-        self._shape = shape if shape is not None else np.shape(radius)
+        self._shape = np.shape(radius)
         self._wavenumber = wavenumber
 
-        if radius is not None:
+        if _is_value(radius):
             self.evaluate(radius, wavenumber)
 
     def evaluate(self, radius, wavenumber=None):
@@ -118,6 +119,7 @@ class _RadialBaseClass:
 
     @property
     def shape(self):
+        # Not a calculated value since we don't pre-allocate the data variable.
         return self._shape
 
     def __getitem__(self, key):
@@ -146,10 +148,10 @@ class DualRadialBase(_RadialBaseClass):
 
 
 class SphericalHarmonics:
-    def __init__(self, order, colatitude=None, azimuth=None, shape=None):
-        shape = shape if shape is not None else np.broadcast(colatitude, azimuth).shape
-        self._legendre = AssociatedLegendrePolynomials(order, shape=shape if shape is not None else np.shape(colatitude), normalization='orthonormal')
-        if azimuth is not None:
+    def __init__(self, order, colatitude=None, azimuth=None):
+        self._legendre = AssociatedLegendrePolynomials(order, x=np.broadcast(colatitude), normalization='orthonormal')
+        self._azimuth = np.broadcast(azimuth)
+        if _is_value(azimuth) and _is_value(colatitude):
             self.evaluate(colatitude=colatitude, azimuth=azimuth)
 
     def evaluate(self, colatitude=None, azimuth=None):
@@ -180,21 +182,22 @@ class SphericalHarmonics:
 
 class SphericalBase:
     def __init__(self, order, position=None, wavenumber=None,
-                 radius=None, colatitude=None, azimuth=None, shape=None):
-        if shape is not None:
-            radial_shape = shape
-            angular_shape = shape
-        elif position is not None:
-            radial_shape = np.shape(position)[1:]
-            angular_shape = np.shape(position)[1:]
+                 radius=None, colatitude=None, azimuth=None):
+        if position is not None:
+            radial_shape = np.broadcast(position[0])
+            colatitude_shape = np.broadcast(position[0])
+            azimuth_shape = np.broadcast(position[0])
         else:
-            angular_shape = np.broadcast(colatitude, azimuth).shape
-            radial_shape = np.shape(radius)
+            radial_shape = np.broadcast(radius)
+            colatitude_shape = np.broadcast(colatitude)
+            azimuth_shape = np.broadcast(azimuth)
 
-        self._angular = SphericalHarmonics(order=order, shape=angular_shape)
-        self._radial = self._radial_cls(order=order, shape=radial_shape)
-        if position is not None or radius is not None:
-            self.evaluate(position=position, wavenumber=wavenumber, radius=radius, colatitude=colatitude, azimuth=azimuth)
+        self._angular = SphericalHarmonics(order=order, colatitude=colatitude_shape, azimuth=azimuth_shape)
+        self._radial = self._radial_cls(order=order, radius=radial_shape)
+        if _is_value(position):
+            self.evaluate(position=position, wavenumber=wavenumber)
+        elif _is_value(radius) and _is_value(colatitude) and _is_value(azimuth):
+            self.evaluate(radius=radius, colatitude=colatitude, azimuth=azimuth, wavenumber=wavenumber)
 
     def evaluate(self, position=None, wavenumber=None, radius=None, colatitude=None, azimuth=None):
         if position is not None:

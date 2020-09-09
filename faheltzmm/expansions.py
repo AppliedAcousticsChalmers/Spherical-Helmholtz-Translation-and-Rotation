@@ -1,27 +1,31 @@
 import numpy as np
+from . import coordinates, _is_value
 
 
 class Expansion:
-    def __init__(self, order=None, shape=None, data=None, wavenumber=None):
+    def __init__(self, order=None, data=None, wavenumber=None):
         self._wavenumber = wavenumber
-
-        if data is None:
-            self._order = order
-            self._shape = () if shape is None else shape
-            num_unique = (self.order + 1) ** 2
-            self._data = np.zeros((num_unique,) + np.shape(self.wavenumber) + self.shape, dtype=complex)
-        else:
-            self._order = (len(data) ** 0.5 - 1) // 1
-            self._shape = np.shape(data)[1 + np.ndim(self.wavenumber):]
+        if _is_value(data):
             self._data = data
+            if order is not None and self.order != order:
+                raise ValueError(f'Received data of order {self.order} in conflict with specified order {order}')
+            if np.shape(wavenumber) != np.shape(data)[1:(np.ndim(wavenumber) + 1)]:
+                raise ValueError(f'Received wavenumber of shape {np.shape(wavenumber)} in conflict with data of shape {np.shape(data)}')
+        elif type(data) == np.broadcast and order is None:
+            self._data = np.zeros(np.shape(data), dtype=complex)
+        elif order is not None:
+            num_unique = (order + 1) ** 2
+            self._data = np.zeros((num_unique,) + np.shape(wavenumber) + np.shape(data), dtype=complex)
+        else:
+            raise ValueError('Cannot initialize expansion without either raw data or known order')
 
     @property
     def order(self):
-        return self._order
+        return int(np.shape(self._data)[0] ** 0.5) - 1
 
     @property
     def shape(self):
-        return self._shape
+        return np.shape(self._data)[(1 + np.ndim(self._wavenumber)):]
 
     @property
     def wavenumber(self):

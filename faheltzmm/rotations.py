@@ -1,14 +1,13 @@
 import numpy as np
-from . import generate, indexing, coordinates, bases, expansions
+from . import generate, indexing, coordinates, bases, expansions, _is_value
 
 
 class ColatitudeRotation:
-    def __init__(self, order, colatitude=None, shape=None, **kwargs):
+    def __init__(self, order, colatitude=None, **kwargs):
         self._order = order
-        self._shape = shape if shape is not None else np.shape(colatitude)
         num_unique = (self.order + 1) * (self.order + 2) * (2 * self.order + 3) // 6
-        self._data = np.zeros((num_unique,) + self._shape, dtype=float)
-        if colatitude is not None:
+        self._data = np.zeros((num_unique,) + np.shape(colatitude), dtype=float)
+        if _is_value(colatitude):
             # kwargs used to pass azimuth angles from `Rotation._init__` to `Rotation.evaluate`
             self.evaluate(colatitude=colatitude, **kwargs)
 
@@ -18,7 +17,7 @@ class ColatitudeRotation:
 
     @property
     def shape(self):
-        return self._shape
+        return np.shape(self._data)[1:]
 
     def _idx(self, order=None, mode_out=None, mode_in=None, index=None):
         if index is None:
@@ -132,15 +131,18 @@ class ColatitudeRotation:
         return self
 
     def apply(self, expansion, inverse=False, out=None):
+        N = min(self.order, expansion.order)  # Allows the rotation coefficients to be used for lower order expansions
         if out is None:
-            shape = np.broadcast(self[0, 0, 0], expansion[0, 0]).shape
+            wavenumber = getattr(expansion, 'wavenumber', None)
+            self_shape = self.shape
+            expansion_shape = np.shape(expansion)
+            output_shape = np.broadcast(np.empty(self_shape, dtype=[]), np.empty(expansion_shape, dtype=[]))
             if isinstance(expansion, expansions.Expansion):
-                out = type(expansion)(order=self.order, shape=shape, wavenumber=expansion.wavenumber)
+                out = type(expansion)(order=N, data=output_shape, wavenumber=wavenumber)
             else:
-                out = expansions.Expansion(order=self.order, shape=shape)
+                out = expansions.Expansion(order=N, data=output_shape, wavenumber=wavenumber)
         elif expansion is out:
             raise NotImplementedError('Rotations cannot currently be applied in place')
-        N = min(self.order, expansion.order)  # Allows the rotation coefficients to be used for lower order expansions
         if not inverse:
             for n in range(N + 1):
                 for p in range(-n, n + 1):
@@ -170,14 +172,16 @@ class ColatitudeRotation:
 
 
 class Rotation(ColatitudeRotation):
-    def __init__(self, order, colatitude=None, primary_azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None, shape=None):
+    def __init__(self, order, colatitude=None, primary_azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None):
         if new_z_axis is not None or old_z_axis is not None:
             colatitude, primary_azimuth, secondary_azimuth = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
+        # Default values for the phases. This has to be set here since the evaluate function only sets new values if new angles are given.
+        self._primary_phase = 1 + 0j
+        self._secondary_phase = 1 + 0j
         # CoalatitudeRotation will pass the azimuth angles through to evaluate.
-        super().__init__(order=order, colatitude=colatitude, shape=shape, primary_azimuth=primary_azimuth, secondary_azimuth=secondary_azimuth)
-        self._shape = np.broadcast(self._shape, primary_azimuth, secondary_azimuth)  # Override the shape set by the ColatitudeRotation
+        super().__init__(order=order, colatitude=colatitude, primary_azimuth=primary_azimuth, secondary_azimuth=secondary_azimuth)
 
-    def evaluate(self, colatitude=None, primary_azimuth=0, secondary_azimuth=0, new_z_axis=None, old_z_axis=None, **kwargs):
+    def evaluate(self, colatitude=None, primary_azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None, **kwargs):
         if new_z_axis is not None or old_z_axis is not None:
             colatitude, primary_azimuth, secondary_azimuth = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
         if colatitude is not None:
@@ -185,8 +189,10 @@ class Rotation(ColatitudeRotation):
             # Useful since changing the azimuth angles is cheap, whilg chanigng
             # the colatitude is expensive.
             super().evaluate(colatitude=colatitude, **kwargs)
-        self._primary_phase = np.exp(1j * primary_azimuth)
-        self._secondary_phase = np.exp(1j * secondary_azimuth)
+        if primary_azimuth is not None:
+            self._primary_phase = np.exp(1j * primary_azimuth)
+        if secondary_azimuth is not None:
+            self._secondary_phase = np.exp(1j * secondary_azimuth)
         return self
 
     @property
