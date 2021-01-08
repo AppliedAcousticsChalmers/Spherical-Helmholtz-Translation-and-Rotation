@@ -99,11 +99,12 @@ class AssociatedLegendrePolynomials:
 class _RadialBaseClass:
     def __init__(self, order, radius=None, wavenumber=None):
         self._order = order
-        self._shape = np.shape(radius)
         self._wavenumber = wavenumber
 
         if _is_value(radius):
             self.evaluate(radius, wavenumber)
+        else:
+            self._data = np.broadcast(radius)
 
     def evaluate(self, radius, wavenumber=None):
         if wavenumber is not None:
@@ -113,7 +114,7 @@ class _RadialBaseClass:
         else:
             x = radius * np.reshape(wavenumber, np.shape(wavenumber) + (1,) * np.ndim(radius))
 
-        order = np.arange(self.order + 1).reshape((-1,) + (1,) * (np.ndim(self.wavenumber) + len(self.shape)))
+        order = np.arange(self.order + 1).reshape((-1,) + (1,) * (np.ndim(self.wavenumber) + len(np.shape(radius))))
         self._data = self._radial_func(order, x)
         return self
 
@@ -123,8 +124,7 @@ class _RadialBaseClass:
 
     @property
     def shape(self):
-        # Not a calculated value since we don't pre-allocate the data variable.
-        return self._shape
+        return np.shape(self._data)[1 + np.ndim(self.wavenumber):]
 
     @property
     def ndim(self):
@@ -153,6 +153,10 @@ class DualRadialBase(_RadialBaseClass):
         bessel = scipy.special.spherical_jn(order, x, derivative=False)
         neumann = scipy.special.spherical_yn(order, x, derivative=False)
         return np.stack([bessel, bessel + 1j * neumann], axis=1)
+
+    @property
+    def shape(self):
+        return np.shape(self._data)[2 + np.ndim(self.wavenumber):]
 
 
 class SphericalHarmonics:
