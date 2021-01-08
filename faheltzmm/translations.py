@@ -279,6 +279,20 @@ class Translation:
         else:
             raise NotImplementedError('Inverse translations not implemented yet.')
 
+    @property
+    def shape(self):
+        coaxial_shape = self._coaxial.shape
+        rotation_shape = self._rotation.shape
+        ndim = max(len(coaxial_shape), len(rotation_shape))
+        coaxial_padded = (1,) * (ndim - len(coaxial_shape)) + coaxial_shape
+        rotation_padded = (1,) * (ndim - len(rotation_shape)) + rotation_shape
+        shape = tuple(max(coax, rot) for coax, rot in zip(coaxial_padded, rotation_padded))
+        return shape
+
+    @property
+    def ndim(self):
+        return max(self._coaxial.ndim, self._rotation.ndim)
+
 
 class InteriorTranslation(Translation):
     _coaxial_cls = InteriorCoaxialTranslation
