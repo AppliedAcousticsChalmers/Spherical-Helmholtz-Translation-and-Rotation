@@ -22,6 +22,10 @@ class AssociatedLegendrePolynomials:
     def shape(self):
         return self._data.shape[1:]
 
+    @property
+    def ndim(self):
+        return len(self.shape)
+
     def evaluate(self, x):
         self._x = x = np.asarray(x)
         one_minus_x_square = 1 - x**2
@@ -122,6 +126,10 @@ class _RadialBaseClass:
         # Not a calculated value since we don't pre-allocate the data variable.
         return self._shape
 
+    @property
+    def ndim(self):
+        return len(self.shape)
+
     def __getitem__(self, key):
         return self._data[key]
 
@@ -179,6 +187,10 @@ class SphericalHarmonics:
     def shape(self):
         return np.broadcast(self._legendre._data[0], self._azimuth).shape
 
+    @property
+    def ndim(self):
+        return len(self.shape)
+
 
 class SphericalBase:
     def __init__(self, order, position=None, wavenumber=None,
@@ -215,6 +227,10 @@ class SphericalBase:
         radial = np.empty(self._radial.shape, dtype=[])
         angular = np.empty(self._angular.shape, dtype=[])
         return np.broadcast(radial, angular).shape
+
+    @property
+    def ndim(self):
+        return len(self.shape)
 
     @property
     def wavenumber(self):

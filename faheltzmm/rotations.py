@@ -19,6 +19,10 @@ class ColatitudeRotation:
     def shape(self):
         return np.shape(self._data)[1:]
 
+    @property
+    def ndim(self):
+        return len(self.shape)
+
     def _idx(self, order=None, mode_out=None, mode_in=None, index=None):
         if index is None:
             # Default mode, get the linear index of a component
@@ -198,6 +202,10 @@ class Rotation(ColatitudeRotation):
     @property
     def shape(self):
         return np.broadcast(self._data[0], self._primary_phase, self._secondary_phase).shape
+
+    @property
+    def ndim(self):
+        return len(self.shape)
 
     def __getitem__(self, key):
         n, p, m = key

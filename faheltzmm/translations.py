@@ -38,6 +38,10 @@ class CoaxialTranslation:
         return np.shape(self._data)[(1 + np.ndim(self._wavenumber)):]
 
     @property
+    def ndim(self):
+        return len(self.shape)
+
+    @property
     def wavenumber(self):
         return self._wavenumber
 
