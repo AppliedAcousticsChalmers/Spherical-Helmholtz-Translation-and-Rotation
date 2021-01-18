@@ -55,6 +55,12 @@ class CoaxialTranslation:
             new_obj._data = self._data
         return new_obj
 
+    def reshape(self, newshape, *args, **kwargs):
+        new_obj = self.copy()
+        non_shape_dims = new_obj._data.ndim - new_obj.ndim
+        new_obj._data = new_obj._data.reshape(new_obj._data.shape[:non_shape_dims] + tuple(newshape))
+        return new_obj
+
     @property
     def wavenumber(self):
         return self._wavenumber
@@ -305,6 +311,13 @@ class Translation:
         new_obj = type(self).__new__(type(self))
         new_obj._coaxial = self._coaxial.copy(deep=deep)
         new_obj._rotation = self._rotation.copy(deep=deep)
+        return new_obj
+
+    def reshape(self, newshape, *args, **kwargs):
+        coaxial_newshape, rotation_newshape = _shape_utilities.broadcast_reshape(self._coaxial.shape, self._rotation.shape, newshape=newshape)
+        new_obj = self.copy()
+        new_obj._coaxial = new_obj._coaxial.reshape(coaxial_newshape)
+        new_obj._rotation = new_obj._rotation.reshape(rotation_newshape)
         return new_obj
 
 

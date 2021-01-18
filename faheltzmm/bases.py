@@ -42,6 +42,14 @@ class AssociatedLegendrePolynomials:
                 new_obj._x = self._x
         return new_obj
 
+    def reshape(self, newshape, *args, **kwargs):
+        # The *args and **kwargs are needed to work correctly with np.reshape as a function.
+        new_obj = self.copy()
+        new_obj._data = np.reshape(new_obj._data, new_obj._data.shape[:1] + tuple(newshape))
+        if hasattr(new_obj, '_x'):
+            new_obj._x = np.reshape(new_obj._x, newshape)
+        return new_obj
+
     def evaluate(self, x):
         self._x = x = np.asarray(x)
         one_minus_x_square = 1 - x**2
@@ -156,6 +164,12 @@ class _RadialBaseClass:
             new_obj._data = self._data
         return new_obj
 
+    def reshape(self, newshape, *args, **kwargs):
+        new_obj = self.copy()
+        non_shape_dims = self._data.ndim - self.ndim
+        new_obj._data = np.reshape(new_obj._data, new_obj._data.shape[:non_shape_dims] + tuple(newshape))
+        return new_obj
+
     def __getitem__(self, key):
         return self._data[key]
 
@@ -230,6 +244,13 @@ class SphericalHarmonics:
             new_obj._azimuth = self._azimuth
         return new_obj
 
+    def reshape(self, newshape, *args, **kwargs):
+        new_obj = self.copy()
+        legendre_newshape, azimuth_newshape = _shape_utilities.broadcast_reshape(self._legendre.shape, self._azimuth.shape, newshape=newshape)
+        new_obj._legendre = new_obj._legendre.reshape(legendre_newshape)
+        new_obj._azimuth = new_obj._azimuth.reshape(azimuth_newshape)
+        return new_obj
+
 
 class SphericalBase:
     def __init__(self, order, position=None, wavenumber=None,
@@ -275,6 +296,13 @@ class SphericalBase:
         new_obj = type(self).__new__(type(self))
         new_obj._angular = self._angular.copy(deep=deep)
         new_obj._radial = self._radial.copy(deep=deep)
+        return new_obj
+
+    def reshape(self, newshape, *args, **kwargs):
+        new_obj = self.copy()
+        angular_newshape, radial_newshape = _shape_utilities.broadcast_reshape(self._angular.shape, self._radial.shape, newshape=newshape)
+        new_obj._angular = new_obj._angular.reshape(angular_newshape)
+        new_obj._radial = new_obj._radial.reshape(radial_newshape)
         return new_obj
 
     @property
