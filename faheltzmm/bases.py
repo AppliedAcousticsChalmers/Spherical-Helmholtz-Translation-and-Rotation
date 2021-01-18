@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.special
 from . import coordinates
-from . import _is_value
+from . import _shape_utilities
 
 
 class AssociatedLegendrePolynomials:
@@ -11,7 +11,7 @@ class AssociatedLegendrePolynomials:
         num_unique = (self.order + 1) * (self.order + 2) // 2
         self._data = np.zeros((num_unique,) + np.shape(x), dtype=float)
 
-        if _is_value(x):
+        if _shape_utilities.is_value(x):
             self.evaluate(x)
 
     @property
@@ -101,7 +101,7 @@ class _RadialBaseClass:
         self._order = order
         self._wavenumber = wavenumber
 
-        if _is_value(radius):
+        if _shape_utilities.is_value(radius):
             self.evaluate(radius, wavenumber)
         else:
             self._data = np.broadcast(radius)
@@ -163,13 +163,13 @@ class SphericalHarmonics:
     def __init__(self, order, colatitude=None, azimuth=None):
         self._legendre = AssociatedLegendrePolynomials(order, x=np.broadcast(colatitude), normalization='orthonormal')
         self._azimuth = np.broadcast(azimuth)
-        if _is_value(azimuth) and _is_value(colatitude):
+        if _shape_utilities.is_value(azimuth) and _shape_utilities.is_value(colatitude):
             self.evaluate(colatitude=colatitude, azimuth=azimuth)
 
     def evaluate(self, colatitude=None, azimuth=None):
         cosine_colatitude = np.cos(colatitude)
         self._legendre.evaluate(cosine_colatitude)
-        self._azimuth = azimuth if np.iscomplexobj(azimuth) else np.exp(1j * azimuth)
+        self._azimuth = np.asarray(azimuth if np.iscomplexobj(azimuth) else np.exp(1j * azimuth))
         return self
 
     def apply(self, expansion):
@@ -210,9 +210,9 @@ class SphericalBase:
 
         self._angular = SphericalHarmonics(order=order, colatitude=colatitude_shape, azimuth=azimuth_shape)
         self._radial = self._radial_cls(order=order, radius=radial_shape)
-        if _is_value(position):
+        if _shape_utilities.is_value(position):
             self.evaluate(position=position, wavenumber=wavenumber)
-        elif _is_value(radius) and _is_value(colatitude) and _is_value(azimuth):
+        elif _shape_utilities.is_value(radius) and _shape_utilities.is_value(colatitude) and _shape_utilities.is_value(azimuth):
             self.evaluate(radius=radius, colatitude=colatitude, azimuth=azimuth, wavenumber=wavenumber)
 
     def evaluate(self, position=None, wavenumber=None, radius=None, colatitude=None, azimuth=None):

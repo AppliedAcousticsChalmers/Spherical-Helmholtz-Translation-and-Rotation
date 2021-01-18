@@ -5,9 +5,4 @@ __version__ = _version.__version__
 del _version  # Keeps the namespace clean!
 
 
-def _is_value(x):
-    from numpy import broadcast
-    return x is not None and type(x) is not broadcast
-
-
 from . import rotations, coordinates, translations, bases  # noqa: F401, E402

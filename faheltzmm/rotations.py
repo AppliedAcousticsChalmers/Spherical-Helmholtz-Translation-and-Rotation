@@ -1,5 +1,5 @@
 import numpy as np
-from . import coordinates, bases, expansions, _is_value
+from . import coordinates, bases, expansions, _shape_utilities
 
 
 class ColatitudeRotation:
@@ -7,7 +7,7 @@ class ColatitudeRotation:
         self._order = order
         num_unique = (self.order + 1) * (self.order + 2) * (2 * self.order + 3) // 6
         self._data = np.zeros((num_unique,) + np.shape(colatitude), dtype=float)
-        if _is_value(colatitude):
+        if _shape_utilities.is_value(colatitude):
             # kwargs used to pass azimuth angles from `Rotation._init__` to `Rotation.evaluate`
             self.evaluate(colatitude=colatitude, **kwargs)
 
@@ -176,12 +176,13 @@ class ColatitudeRotation:
 
 
 class Rotation(ColatitudeRotation):
+    # Subclass of ColatitudeRptation to get access to the `apply` method, which work the same for both types of rotation.
     def __init__(self, order, colatitude=None, primary_azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None):
         if new_z_axis is not None or old_z_axis is not None:
             colatitude, primary_azimuth, secondary_azimuth = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
         # Default values for the phases. This has to be set here since the evaluate function only sets new values if new angles are given.
-        self._primary_phase = 1 + 0j
-        self._secondary_phase = 1 + 0j
+        self._primary_phase = np.array(1 + 0j)
+        self._secondary_phase = np.array(1 + 0j)
         # CoalatitudeRotation will pass the azimuth angles through to evaluate.
         super().__init__(order=order, colatitude=colatitude, primary_azimuth=primary_azimuth, secondary_azimuth=secondary_azimuth)
 
@@ -194,9 +195,9 @@ class Rotation(ColatitudeRotation):
             # the colatitude is expensive.
             super().evaluate(colatitude=colatitude, **kwargs)
         if primary_azimuth is not None:
-            self._primary_phase = np.exp(1j * primary_azimuth)
+            self._primary_phase = np.asarray(np.exp(1j * primary_azimuth))
         if secondary_azimuth is not None:
-            self._secondary_phase = np.exp(1j * secondary_azimuth)
+            self._secondary_phase = np.asarray(np.exp(1j * secondary_azimuth))
         return self
 
     @property

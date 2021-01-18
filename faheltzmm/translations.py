@@ -1,5 +1,5 @@
 import numpy as np
-from . import coordinates, rotations, expansions, _is_value
+from . import coordinates, rotations, expansions, _shape_utilities
 
 
 class CoaxialTranslation:
@@ -10,6 +10,7 @@ class CoaxialTranslation:
         self._output_order = output_order
         self._min_order = min(self.input_order, self.output_order)
         self._max_order = max(self.input_order, self.output_order)
+        self._wavenumber = None
 
         num_unique = (
             (self._min_order + 1)**2 * (self._max_order + 1)
@@ -18,7 +19,7 @@ class CoaxialTranslation:
         )
         self._data = np.zeros((num_unique,) + np.shape(wavenumber) + np.shape(distance), self._dtype)
 
-        if _is_value(distance):
+        if _shape_utilities.is_value(distance):
             self.evaluate(distance=distance, wavenumber=wavenumber)
 
     @property
@@ -260,9 +261,9 @@ class Translation:
             colatitude=colatitude_shape, primary_azimuth=azimuth_shape
         )
 
-        if _is_value(position):
+        if _shape_utilities.is_value(position):
             self.evaluate(position=position, wavenumber=wavenumber)
-        elif _is_value(radius) and _is_value(colatitude) and _is_value(azimuth):
+        elif _shape_utilities.is_value(radius) and _shape_utilities.is_value(colatitude) and _shape_utilities.is_value(azimuth):
             self.evaluate(radius=radius, colatitude=colatitude, azimuth=azimuth, wavenumber=wavenumber)
 
     def evaluate(self, position=None, wavenumber=None, radius=None, colatitude=None, azimuth=None):

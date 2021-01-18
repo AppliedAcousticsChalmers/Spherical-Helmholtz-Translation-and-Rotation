@@ -1,11 +1,11 @@
 import numpy as np
-from . import coordinates, _is_value
+from . import coordinates, _shape_utilities
 
 
 class Expansion:
     def __init__(self, order=None, data=None, wavenumber=None):
         self._wavenumber = wavenumber
-        if _is_value(data):
+        if _shape_utilities.is_value(data):
             self._data = data
             if order is not None and self.order != order:
                 raise ValueError(f'Received data of order {self.order} in conflict with specified order {order}')
