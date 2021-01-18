@@ -245,10 +245,24 @@ class SphericalBase:
         return self._radial[order] * self._angular[order, mode]
 
     def apply(self, expansion):
+        wavenumber = getattr(expansion, 'wavenumber', None)
+        if wavenumber is not None:
+            if not np.allclose(wavenumber, self.wavenumber):
+                raise ValueError('Cannot apply bases to expansion of different wavenuber')
+        else:
+            # An expansion can be defined without a wavenumber, but for the
+            # reshaping below to work properly, `wavenumber` needs to have the
+            # same number of dimentions as `self.wavenumber`.
+            wavenumber = np.reshape(wavenumber, np.ndim(self.wavenumber) * [1])
+
+        ndim = max(self.ndim, expansion.ndim)
+        exp_shape = np.shape(wavenumber) + (ndim - expansion.ndim) * (1,) + expansion.shape
+        self_shape = np.shape(self.wavenumber) + (ndim - self.ndim) * (1,) + self.shape
+
         value = 0
         for n in range(min(self.order, expansion.order) + 1):
             for m in range(-n, n + 1):
-                value += self[n, m] * expansion[n, m]
+                value += self[n, m].reshape(self_shape) * expansion[n, m].reshape(exp_shape)
         return value
 
 
