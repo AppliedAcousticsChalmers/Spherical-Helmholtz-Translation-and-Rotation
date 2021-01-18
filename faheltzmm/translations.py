@@ -66,7 +66,7 @@ class CoaxialTranslation:
         return self._wavenumber
 
     @property
-    def _coefficient_indices(self):
+    def _component_indices(self):
         out = []
         for m in range(self._min_order + 1):
             for n in range(m, self._min_order + 1):

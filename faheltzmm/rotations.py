@@ -69,7 +69,7 @@ class ColatitudeRotation:
             return order, mode_out, mode_in
 
     @property
-    def _coefficient_indices(self):
+    def _component_indices(self):
         out = []
         for n in range(self.order + 1):
             for p in range(n + 1):
