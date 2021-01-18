@@ -295,13 +295,7 @@ class Translation:
 
     @property
     def shape(self):
-        coaxial_shape = self._coaxial.shape
-        rotation_shape = self._rotation.shape
-        ndim = max(len(coaxial_shape), len(rotation_shape))
-        coaxial_padded = (1,) * (ndim - len(coaxial_shape)) + coaxial_shape
-        rotation_padded = (1,) * (ndim - len(rotation_shape)) + rotation_shape
-        shape = tuple(max(coax, rot) for coax, rot in zip(coaxial_padded, rotation_padded))
-        return shape
+        return _shape_utilities.broadcast_shapes(self._coaxial.shape, self._rotation.shape, output='new')
 
     @property
     def ndim(self):

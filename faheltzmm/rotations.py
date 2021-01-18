@@ -16,8 +16,13 @@ class ColatitudeRotation:
         return self._order
 
     @property
-    def shape(self):
+    def _colatitude_shape(self):
         return np.shape(self._data)[1:]
+
+    @property
+    def shape(self):
+        # Detour so that we can still access the colatitude shape from the Rotation class
+        return self._colatitude_shape
 
     @property
     def ndim(self):
@@ -211,7 +216,7 @@ class Rotation(ColatitudeRotation):
 
     @property
     def shape(self):
-        return np.broadcast(self._data[0], self._primary_phase, self._secondary_phase).shape
+        return _shape_utilities.broadcast_shapes(self._colatitude_shape, self._primary_phase.shape, self._secondary_phase.shape, output='new')
 
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)

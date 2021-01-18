@@ -215,7 +215,7 @@ class SphericalHarmonics:
 
     @property
     def shape(self):
-        return np.broadcast(self._legendre._data[0], self._azimuth).shape
+        return _shape_utilities.broadcast_shapes(self._legendre.shape, self._azimuth.shape, output='new')
 
     @property
     def ndim(self):

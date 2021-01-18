@@ -84,6 +84,9 @@ class Expansion:
                 and (self.wavenumber is other.wavenumber or np.allclose(self.wavenumber, other.wavenumber))
                 )
 
+    def __eq__(self, other):
+        return self._compatible_with(other) and np.allclose(self._data, other._data)
+
     def __add__(self, other):
         if self._compatible_with(other):
             return type(self)(data=self._data + other._data, wavenumber=self.wavenumber)
