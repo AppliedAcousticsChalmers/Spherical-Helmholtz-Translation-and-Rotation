@@ -23,6 +23,15 @@ class ColatitudeRotation:
     def ndim(self):
         return len(self.shape)
 
+    def copy(self, deep=False):
+        new_obj = type(self).__new__(type(self))
+        new_obj._order = self._order
+        if deep:
+            new_obj._data = self._data.copy()
+        else:
+            new_obj._data = self._data
+        return new_obj
+
     def _idx(self, order=None, mode_out=None, mode_in=None, index=None):
         if index is None:
             # Default mode, get the linear index of a component
@@ -204,9 +213,16 @@ class Rotation(ColatitudeRotation):
     def shape(self):
         return np.broadcast(self._data[0], self._primary_phase, self._secondary_phase).shape
 
-    @property
-    def ndim(self):
-        return len(self.shape)
+    def copy(self, deep=False):
+        new_obj = super().copy(deep=deep)
+        if deep:
+            new_obj._primary_phase = self._primary_phase.copy()
+            new_obj._secondary_phase = self._secondary_phase.copy()
+        else:
+            new_obj._primary_phase = self._primary_phase
+            new_obj._secondary_phase = self._secondary_phase
+        return new_obj
+
 
     def __getitem__(self, key):
         n, p, m = key

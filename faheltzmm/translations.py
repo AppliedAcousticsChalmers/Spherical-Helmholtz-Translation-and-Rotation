@@ -42,6 +42,19 @@ class CoaxialTranslation:
     def ndim(self):
         return len(self.shape)
 
+    def copy(self, deep=False):
+        new_obj = type(self).__new__(type(self))
+        new_obj._input_order = self._input_order
+        new_obj._output_order = self._output_order
+        new_obj._max_order = self._max_order
+        new_obj._min_order = self._min_order
+        new_obj._wavenumber = self._wavenumber
+        if deep:
+            new_obj._data = self._data.copy()
+        else:
+            new_obj._data = self._data
+        return new_obj
+
     @property
     def wavenumber(self):
         return self._wavenumber
@@ -293,6 +306,12 @@ class Translation:
     @property
     def ndim(self):
         return max(self._coaxial.ndim, self._rotation.ndim)
+
+    def copy(self, deep=False):
+        new_obj = type(self).__new__(type(self))
+        new_obj._coaxial = self._coaxial.copy(deep=deep)
+        new_obj._rotation = self._rotation.copy(deep=deep)
+        return new_obj
 
 
 class InteriorTranslation(Translation):

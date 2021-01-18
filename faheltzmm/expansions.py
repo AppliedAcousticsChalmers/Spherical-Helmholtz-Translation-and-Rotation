@@ -31,6 +31,15 @@ class Expansion:
     def ndim(self):
         return len(self.shape)
 
+    def copy(self, deep=False):
+        new_obj = type(self).__new__(type(self))
+        new_obj._wavenumber = self._wavenumber
+        if deep:
+            new_obj._data = self._data.copy()
+        else:
+            new_obj._data = self._data
+        return new_obj
+
     @property
     def wavenumber(self):
         return self._wavenumber

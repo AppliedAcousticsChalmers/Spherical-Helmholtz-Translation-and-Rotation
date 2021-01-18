@@ -26,6 +26,22 @@ class AssociatedLegendrePolynomials:
     def ndim(self):
         return len(self.shape)
 
+    def copy(self, deep=False):
+        new_obj = type(self).__new__(type(self))
+        new_obj.normalization = self.normalization
+        new_obj._order = self.order
+        if deep:
+            new_obj._data = self._data.copy()
+        else:
+            new_obj._data = self._data
+
+        if hasattr(self, '_x'):
+            if deep:
+                new_obj._x = self._x.copy()
+            else:
+                new_obj._x = self._x
+        return new_obj
+
     def evaluate(self, x):
         self._x = x = np.asarray(x)
         one_minus_x_square = 1 - x**2
@@ -130,6 +146,16 @@ class _RadialBaseClass:
     def ndim(self):
         return len(self.shape)
 
+    def copy(self, deep=False):
+        new_obj = type(self).__new__(type(self))
+        new_obj._order = self.order
+        new_obj._wavenumber = self.wavenumber
+        if deep:
+            new_obj._data = self._data.copy()
+        else:
+            new_obj._data = self._data
+        return new_obj
+
     def __getitem__(self, key):
         return self._data[key]
 
@@ -195,6 +221,15 @@ class SphericalHarmonics:
     def ndim(self):
         return len(self.shape)
 
+    def copy(self, deep=False):
+        new_obj = type(self).__new__(type(self))
+        new_obj._legendre = self._legendre.copy(deep=deep)
+        if deep:
+            new_obj._azimuth = self._azimuth.copy()
+        else:
+            new_obj._azimuth = self._azimuth
+        return new_obj
+
 
 class SphericalBase:
     def __init__(self, order, position=None, wavenumber=None,
@@ -235,6 +270,12 @@ class SphericalBase:
     @property
     def ndim(self):
         return len(self.shape)
+
+    def copy(self, deep=False):
+        new_obj = type(self).__new__(type(self))
+        new_obj._angular = self._angular.copy(deep=deep)
+        new_obj._radial = self._radial.copy(deep=deep)
+        return new_obj
 
     @property
     def wavenumber(self):
