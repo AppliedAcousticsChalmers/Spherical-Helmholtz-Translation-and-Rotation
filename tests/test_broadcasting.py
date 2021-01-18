@@ -174,7 +174,7 @@ def test_ColatitudeRotation(input_order, colatitude):
 
 def test_Rotation(input_order, colatitude_azimuth):
     colatitude, azimuth = colatitude_azimuth
-    obj = faheltzmm.rotations.Rotation(order=input_order, colatitude=colatitude, primary_azimuth=azimuth)
+    obj = faheltzmm.rotations.Rotation(order=input_order, colatitude=colatitude, azimuth=azimuth)
     assert_shape_match(obj, np.broadcast(colatitude, azimuth))
     assert_shape_match(obj._primary_phase, azimuth)
     assert_rehsapability(obj)

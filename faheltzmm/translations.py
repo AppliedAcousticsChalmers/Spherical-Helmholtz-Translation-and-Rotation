@@ -277,7 +277,7 @@ class Translation:
         )
         self._rotation = rotations.Rotation(
             order=max(input_order, output_order),
-            colatitude=colatitude_shape, primary_azimuth=azimuth_shape
+            colatitude=colatitude_shape, azimuth=azimuth_shape
         )
 
         if _shape_utilities.is_value(position):
@@ -290,7 +290,7 @@ class Translation:
             radius, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
         if radius is not None:
             self._coaxial.evaluate(distance=radius, wavenumber=wavenumber)
-        self._rotation.evaluate(colatitude=colatitude, primary_azimuth=azimuth)
+        self._rotation.evaluate(colatitude=colatitude, azimuth=azimuth)
         return self
 
     def apply(self, expansion, inverse=False):

@@ -40,13 +40,13 @@ def test_inverse_rotations(old_coefficients, new_coefficients, inverse_rotation_
 
 def test_angle_specification_rotation_coefficients(rotation_coefficients, axis_angles, order):
     beta, alpha, gamma = axis_angles
-    manual_coefficients = faheltzmm.rotations.Rotation(order=order, colatitude=beta, primary_azimuth=alpha, secondary_azimuth=np.pi - gamma)
+    manual_coefficients = faheltzmm.rotations.Rotation(order=order, colatitude=beta, azimuth=alpha, secondary_azimuth=np.pi - gamma)
     np.testing.assert_allclose(manual_coefficients._data, rotation_coefficients._data)
 
 
 def test_inverse_rotation_coefficients(inverse_rotation_coefficients, axis_angles, order):
     beta, alpha, gamma = axis_angles
-    manual_inverse_coefficients = faheltzmm.rotations.Rotation(order=order, colatitude=beta, primary_azimuth=gamma, secondary_azimuth=np.pi - alpha)
+    manual_inverse_coefficients = faheltzmm.rotations.Rotation(order=order, colatitude=beta, azimuth=gamma, secondary_azimuth=np.pi - alpha)
     np.testing.assert_allclose(manual_inverse_coefficients._data, inverse_rotation_coefficients._data)
 
 

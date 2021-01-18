@@ -197,25 +197,25 @@ class ColatitudeRotation:
 
 class Rotation(ColatitudeRotation):
     # Subclass of ColatitudeRptation to get access to the `apply` method, which work the same for both types of rotation.
-    def __init__(self, order, colatitude=None, primary_azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None):
+    def __init__(self, order, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None):
         if new_z_axis is not None or old_z_axis is not None:
-            colatitude, primary_azimuth, secondary_azimuth = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
+            colatitude, azimuth, secondary_azimuth = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
         # Default values for the phases. This has to be set here since the evaluate function only sets new values if new angles are given.
         self._primary_phase = np.array(1 + 0j)
         self._secondary_phase = np.array(1 + 0j)
         # CoalatitudeRotation will pass the azimuth angles through to evaluate.
-        super().__init__(order=order, colatitude=colatitude, primary_azimuth=primary_azimuth, secondary_azimuth=secondary_azimuth)
+        super().__init__(order=order, colatitude=colatitude, azimuth=azimuth, secondary_azimuth=secondary_azimuth)
 
-    def evaluate(self, colatitude=None, primary_azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None, **kwargs):
+    def evaluate(self, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None, **kwargs):
         if new_z_axis is not None or old_z_axis is not None:
-            colatitude, primary_azimuth, secondary_azimuth = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
+            colatitude, azimuth, secondary_azimuth = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
         if colatitude is not None:
             # Allows changing the azimuth angles without changing the colatitude.
             # Useful since changing the azimuth angles is cheap, whilg chanigng
             # the colatitude is expensive.
             super().evaluate(colatitude=colatitude, **kwargs)
-        if primary_azimuth is not None:
-            self._primary_phase = np.asarray(np.exp(1j * primary_azimuth))
+        if azimuth is not None:
+            self._primary_phase = np.asarray(np.exp(1j * azimuth))
         if secondary_azimuth is not None:
             self._secondary_phase = np.asarray(np.exp(1j * secondary_azimuth))
         return self

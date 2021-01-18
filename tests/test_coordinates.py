@@ -26,7 +26,7 @@ def test_trigonometric_invertability(position):
     np.testing.assert_allclose(position, np.stack([x, y, z], axis=0), rtol=1e-6, atol=1e-12)
 
 
-@pytest.mark.parametrize("original, target, colatitude, primary_azimuth, secondary_azimuth", [
+@pytest.mark.parametrize("original, target, colatitude, azimuth, secondary_azimuth", [
     # Rotations of positive x-axis
     ([1, 0, 0], [1, 0, 0], 0, -next(twice_random), next(twice_random)), ([1, 0, 0], [1, 0, 0], 0, 2 * np.pi - next(twice_random), next(twice_random)),
     ([1, 0, 0], [-1, 0, 0], 0, np.pi - next(twice_random), next(twice_random)), ([1, 0, 0], [-1, 0, 0], 0, next(twice_random), np.pi - next(twice_random)),
@@ -64,8 +64,8 @@ def test_trigonometric_invertability(position):
     ([0, 0, -1], [0, -1, 0], np.pi / 2, np.pi / 2, np.random.normal()), ([0, 0, -1], [0, -1, 0], np.pi / 2, -1.5 * np.pi, np.random.normal()),
     ([0, 0, -1], [0, 0, 1], np.pi, np.random.normal(), np.random.normal()), ([0, 0, -1], [0, 0, -1], 0, np.random.normal(), np.random.normal()),
 ])
-def test_axis_rotations(original, target, colatitude, primary_azimuth, secondary_azimuth):
-    rotation_matrix = faheltzmm.coordinates.rotation_matrix(colatitude=colatitude, primary_azimuth=primary_azimuth, secondary_azimuth=secondary_azimuth)
+def test_axis_rotations(original, target, colatitude, azimuth, secondary_azimuth):
+    rotation_matrix = faheltzmm.coordinates.rotation_matrix(colatitude=colatitude, azimuth=azimuth, secondary_azimuth=secondary_azimuth)
     np.testing.assert_allclose(rotation_matrix.T @ original, target, atol=1e-15)
 
 

@@ -87,21 +87,21 @@ def spherical_2_cartesian(radius, colatitude, azimuth):
     return radius * np.stack([x, y, z], axis=0)
 
 
-def rotation_matrix(colatitude, primary_azimuth, secondary_azimuth):
+def rotation_matrix(colatitude, azimuth, secondary_azimuth):
     return np.array([
         [
-            np.cos(colatitude) * np.cos(secondary_azimuth) * np.cos(primary_azimuth) - np.sin(secondary_azimuth) * np.sin(primary_azimuth),
-            np.cos(colatitude) * np.cos(secondary_azimuth) * np.sin(primary_azimuth) + np.sin(secondary_azimuth) * np.cos(primary_azimuth),
+            np.cos(colatitude) * np.cos(secondary_azimuth) * np.cos(azimuth) - np.sin(secondary_azimuth) * np.sin(azimuth),
+            np.cos(colatitude) * np.cos(secondary_azimuth) * np.sin(azimuth) + np.sin(secondary_azimuth) * np.cos(azimuth),
             -np.sin(colatitude) * np.cos(secondary_azimuth),
         ],
         [
-            -np.cos(colatitude) * np.sin(secondary_azimuth) * np.cos(primary_azimuth) - np.cos(secondary_azimuth) * np.sin(primary_azimuth),
-            np.cos(secondary_azimuth) * np.cos(primary_azimuth) - np.cos(colatitude) * np.sin(secondary_azimuth) * np.sin(primary_azimuth),
+            -np.cos(colatitude) * np.sin(secondary_azimuth) * np.cos(azimuth) - np.cos(secondary_azimuth) * np.sin(azimuth),
+            np.cos(secondary_azimuth) * np.cos(azimuth) - np.cos(colatitude) * np.sin(secondary_azimuth) * np.sin(azimuth),
             np.sin(colatitude) * np.sin(secondary_azimuth),
         ],
         [
-            np.sin(colatitude) * np.cos(primary_azimuth),
-            np.sin(colatitude) * np.sin(primary_azimuth),
+            np.sin(colatitude) * np.cos(azimuth),
+            np.sin(colatitude) * np.sin(azimuth),
             np.cos(colatitude)
         ],
     ])
