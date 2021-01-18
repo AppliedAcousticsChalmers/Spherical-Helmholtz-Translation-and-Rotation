@@ -10,4 +10,4 @@ def _is_value(x):
     return x is not None and type(x) is not broadcast
 
 
-from . import generate, rotations, coordinates, translations, bases  # noqa: F401, E402
+from . import rotations, coordinates, translations, bases  # noqa: F401, E402

@@ -1,8 +1,6 @@
 import numpy as np
 import faheltzmm.rotations
-import faheltzmm.generate
 import faheltzmm.coordinates
-import faheltzmm.indexing
 import pytest
 
 
