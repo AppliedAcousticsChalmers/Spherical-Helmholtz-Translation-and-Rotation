@@ -246,16 +246,19 @@ class CoaxialTranslation:
 class InteriorCoaxialTranslation(CoaxialTranslation):
     _dtype = float
     from .bases import RegularRadialBase as _recurrence_initialization
+    _default_output_type = expansions.InteriorExpansion
 
 
 class ExteriorCoaxialTranslation(CoaxialTranslation):
     _dtype = float
     from .bases import RegularRadialBase as _recurrence_initialization
+    _default_output_type = expansions.ExteriorExpansion
 
 
 class ExteriorInteriorCoaxialTranslation(CoaxialTranslation):
     _dtype = complex
     from .bases import SingularRadialBase as _recurrence_initialization
+    _default_output_type = expansions.InteriorExpansion
 
 
 class Translation:

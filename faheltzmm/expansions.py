@@ -66,7 +66,7 @@ class Expansion:
             return (order, mode)
 
     @property
-    def _coefficient_indices(self):
+    def _component_indices(self):
         out = []
         for n in range(self.order + 1):
             for m in range(-n, n + 1):
@@ -133,4 +133,51 @@ class Expansion:
 
     def apply(self, transform, *args, **kwargs):
         return transform.apply(self, *args, **kwargs)
+
+    def rotate(self, colatitude=0, azimuth=0, secondary_azimuth=0, new_z_axis=None, old_z_axis=None):
+        from .rotations import Rotation
+        return Rotation(
+            order=self.order, colatitude=colatitude,
+            azimuth=azimuth, secondary_azimuth=secondary_azimuth,
+            new_z_axis=new_z_axis, old_z_axis=old_z_axis
+        ).apply(self)
+
+
+class SphericalSurfaceExpansion(Expansion):
+    from .bases import SphericalHarmonics as _base_cls
+
+
+class InteriorExpansion(Expansion):
+    from .bases import RegularBase as _base_cls
+
+    def translate(self, position=None, order=None, radius=None, colatitude=None, azimuth=None):
+        from .translations import InteriorTranslation
+        return InteriorTranslation(
+            input_order=self.order, output_order=self.order if order is None else order,
+            position=position, radius=radius, colatitude=colatitude, azimuth=azimuth,
+            wavenumber=self.wavenumber
+        ).apply(self)
+
+    def reexpand(self, position, order=None):
+        return self.translate(position=-position, order=order)
+
+
+class ExteriorExpansion(Expansion):
+    from .bases import SingularBase as _base_cls
+
+    def translate(self, order=None, position=None, radius=None, colatitude=None, azimuth=None, domain='extreior'):
+        if domain == 'exterior':
+            from .translations import ExteriorTranslation as TranslationCls
+        elif domain == 'interior':
+            from .translations import ExteriorInteriorTranslation as TranslationCls
+        else:
+            raise ValueError(f'Unknown domain `{domain}`')
+        return TranslationCls(
+            input_order=self.order, output_order=self.order if order is None else order,
+            position=position, radius=radius, colatitude=colatitude, azimuth=azimuth,
+            wavenumber=self.wavenumber
+        ).apply(self)
+
+    def reexpand(self, position, order=None, domain='exterior'):
+        return self.translate(position=-position, order=order, domain=domain)
 
