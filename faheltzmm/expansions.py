@@ -142,6 +142,18 @@ class Expansion:
             new_z_axis=new_z_axis, old_z_axis=old_z_axis
         ).apply(self)
 
+    def evaluate(self, position=None, radius=None, colatitude=None, azimuth=None):
+        try:
+            return self._base_cls(
+                order=self.order, wavenumber=self.wavenumber, position=position,
+                radius=radius, colatitude=colatitude, azimuth=azimuth
+            ).apply(self)
+        except AttributeError as e:
+            if "no attribute '_base_cls'" in str(e):
+                raise ValueError('Cannot evaluate expansion without a related base')
+            else:
+                raise e
+
 
 class SphericalSurfaceExpansion(Expansion):
     from .bases import SphericalHarmonics as _base_cls
