@@ -193,3 +193,50 @@ class ExteriorExpansion(Expansion):
     def reexpand(self, position, order=None, domain='exterior'):
         return self.translate(position=-position, order=order, domain=domain)
 
+
+def plane_wave(order, strength=1, colatitude=None, azimuth=None, wavenumber=None, wavevector=None):
+    r"""Create an expansion of a plane wave.
+
+    The propagation direction of the plane wave can be specified using either
+    a wavevector, or by colatitude, azimuth, and wavenumber.
+    The strength :math:`q` referes to the scaling of a plane wave
+    :math:`q \exp{i \vec k \cdot \vec r}`, where :math:`\vec r` is the position
+    in the field, and :math:`\vec k` is the wavevector.
+    """
+    from .bases import SphericalHarmonics
+    if wavevector is not None:
+        wavenumber, colatitude, azimuth = coordinates.cartesian_2_spherical(wavevector)
+    expansion = InteriorExpansion(order=order, data=np.broadcast(colatitude, azimuth), wavenumber=wavenumber)
+    spherical_harmonics = SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
+    strength = strength * 4 * np.pi
+    for n in range(order + 1):
+        for m in range(-n, n + 1):
+            expansion[n, m] = strength * spherical_harmonics[n, m].conj() * (1j) ** n
+    return expansion
+
+
+def monopole(strength=1, order=0, wavenumber=1, position=None, domain='exterior'):
+    r"""Create a monopole source expansion.
+
+    If the monopole is not centered at the origin, it will be translated.
+    Depending on where the resulting expansion should be evaluated, the target
+    domain should be specified.
+    If `domain='exterior'` (default), an exterior expansion will be returned,
+    i.e. an expansion which is valid further away from the origin than the
+    source location. Thus, the expansion should be evaluated using the singular
+    bases, and in the exterior domain.
+    If `domain='interior'`, an interior expansion will be returned,
+    i.e. an expansion which is valid closer to from the origin than the
+    source location. Thus, the expansion should be evaluated using the regular
+    bases, and in the interior domain.
+    A monopole at the origin (`position=None`) is always an exterior expansion.
+
+    The strength :math:`q` refers to the scaling of the monopole radiation
+    :math:`{q \over 4 \pi r} \exp{ikr}` where :math:`r` is the distance to the
+    source and :math:`k` is the wavenubmer.
+    """
+    strength = strength * wavenumber * 1j / (4 * np.pi)**0.5
+    expansion = ExteriorExpansion(order=0, data=[strength], wavenumber=wavenumber)
+    if position is not None:
+        expansion = expansion.translate(order=order, position=position, domain=domain)
+    return expansion
