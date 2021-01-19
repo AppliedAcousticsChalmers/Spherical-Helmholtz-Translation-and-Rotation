@@ -200,13 +200,22 @@ class DualRadialBase(_RadialBaseClass):
 
 
 class SphericalHarmonics:
-    def __init__(self, order, colatitude=None, azimuth=None):
-        self._legendre = AssociatedLegendrePolynomials(order, x=np.broadcast(colatitude), normalization='orthonormal')
-        self._azimuth = np.broadcast(azimuth)
-        if _shape_utilities.is_value(azimuth) and _shape_utilities.is_value(colatitude):
+    def __init__(self, order, position=None, colatitude=None, azimuth=None, *args, **kwargs):
+        if position is not None:
+            colatitude_shape = azimuth_shape = np.broadcast(position[0])
+        else:
+            colatitude_shape = np.broadcast(colatitude)
+            azimuth_shape = np.broadcast(azimuth)
+        self._legendre = AssociatedLegendrePolynomials(order, x=colatitude_shape, normalization='orthonormal')
+        self._azimuth = azimuth_shape
+        if _shape_utilities.is_value(position):
+            self.evaluate(position=position)
+        elif _shape_utilities.is_value(azimuth) and _shape_utilities.is_value(colatitude):
             self.evaluate(colatitude=colatitude, azimuth=azimuth)
 
-    def evaluate(self, colatitude=None, azimuth=None):
+    def evaluate(self, position=None, colatitude=None, azimuth=None):
+        if position is not None:
+            _, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
         cosine_colatitude = np.cos(colatitude)
         self._legendre.evaluate(cosine_colatitude)
         self._azimuth = np.asarray(azimuth if np.iscomplexobj(azimuth) else np.exp(1j * azimuth))
@@ -331,7 +340,7 @@ class SphericalBase:
         value = 0
         for n in range(min(self.order, expansion.order) + 1):
             for m in range(-n, n + 1):
-                value += self[n, m].reshape(self_shape) * expansion[n, m].reshape(exp_shape)
+                value += np.reshape(self[n, m], self_shape) * np.reshape(expansion[n, m], exp_shape)
         return value
 
 
