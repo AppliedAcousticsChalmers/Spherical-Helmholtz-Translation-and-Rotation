@@ -4,19 +4,17 @@ from . import coordinates
 from . import _shape_utilities
 
 
-class AssociatedLegendrePolynomials:
+class LegendrePolynomials:
     def __init__(self, order, x=None, normalization='orthonormal'):
-        self._order = order
         self.normalization = normalization
-        num_unique = (self.order + 1) * (self.order + 2) // 2
-        self._data = np.zeros((num_unique,) + np.shape(x), dtype=float)
+        self._data = np.zeros((order + 1,) + np.shape(x), dtype=float)
 
         if _shape_utilities.is_value(x):
             self.evaluate(x)
 
     @property
     def order(self):
-        return self._order
+        return self._data.shape[0] - 1
 
     @property
     def shape(self):
@@ -49,6 +47,63 @@ class AssociatedLegendrePolynomials:
         if hasattr(new_obj, '_x'):
             new_obj._x = np.reshape(new_obj._x, newshape)
         return new_obj
+
+    def evaluate(self, x):
+        self._x = x = np.asarray(x)
+        self._data[0] = 1 / 2**0.5
+        if self.order > 0:
+            self._data[1] = x * 1.5**0.5
+        for n in range(2, self.order + 1):
+            self._data[n] = (
+                x * self._data[n - 1] / n * ((2 * n + 1) * (2 * n - 1))**0.5
+                - self._data[n - 2] * (n - 1) / n * ((2 * n + 1) / (2 * n - 3))**0.5
+            )
+        return self
+
+    def _normalization_factor(self, order, mode=0):
+        if 'complement' in self.normalization.lower():
+            return 1
+
+        if mode == 0:
+            ortho_norm = 1
+        else:
+            ortho_norm = (1 - self._x**2) ** (abs(mode) / 2)
+
+        if 'orthonormal' in self.normalization.lower():
+            return ortho_norm
+
+        if mode == 0:
+            numer = 2
+            denom = (2 * order + 1)
+        else:
+            numer = 2 * scipy.special.factorial(order + mode)
+            denom = scipy.special.factorial(order - mode) * (2 * order + 1)
+
+        if 'scipy' in self.normalization.lower():
+            return ortho_norm * (numer / denom) ** 0.5
+
+    def __getitem__(self, key):
+        return self._data[key] * self._normalization_factor(key)
+
+    def apply(self, expansion):
+        value = 0
+        for n in range(self.order + 1):
+            value += self[n] * expansion[n]
+        return value
+
+
+class AssociatedLegendrePolynomials(LegendrePolynomials):
+    def __init__(self, order, x=None, normalization='orthonormal'):
+        self.normalization = normalization
+        num_unique = (order + 1) * (order + 2) // 2
+        self._data = np.zeros((num_unique,) + np.shape(x), dtype=float)
+
+        if _shape_utilities.is_value(x):
+            self.evaluate(x)
+
+    @property
+    def order(self):
+        return int((8 * self._data.shape[0] + 1)**0.5 - 3) // 2
 
     def evaluate(self, x):
         self._x = x = np.asarray(x)
@@ -101,16 +156,7 @@ class AssociatedLegendrePolynomials:
         else:
             sign = 1
         value = self._data[self._idx(order, abs(mode))]
-        if 'complement' in self.normalization.lower():
-            return value * sign
-        if 'orthonormal' in self.normalization.lower():
-            norm = (1 - self._x**2) ** (abs(mode) / 2)
-            return value * norm * sign
-        if 'scipy' in self.normalization.lower():
-            numer = 2 * scipy.special.factorial(order + mode)
-            denom = scipy.special.factorial(order - mode) * (2 * order + 1)
-            norm = (1 - self._x**2) ** (abs(mode) / 2) * (numer / denom) ** 0.5
-            return value * norm * sign
+        return value * sign * self._normalization_factor(order, mode)
 
     def apply(self, expansion):
         value = 0

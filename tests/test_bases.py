@@ -59,15 +59,26 @@ def wavenumber(position):
 
 
 def test_legendre_values(order, cosine_colatitude):
-    legendre = faheltzmm.bases.AssociatedLegendrePolynomials(order=order, x=cosine_colatitude)
+    associated_legendre = faheltzmm.bases.AssociatedLegendrePolynomials(order=order, x=cosine_colatitude)
+    legendre = faheltzmm.bases.LegendrePolynomials(order=order, x=cosine_colatitude)
     for n in range(order + 1):
+        associated_legendre.normalization = 'scipy'
+        legendre.normalization = 'scipy'
+        np.testing.assert_allclose(associated_legendre[n, 0], legendre[n], err_msg=f'Mismatch of associated Legendre and Legendre for scipy normalization at n={n}')
+        associated_legendre.normalization = 'orthonormal'
+        legendre.normalization = 'orthonormal'
+        np.testing.assert_allclose(associated_legendre[n, 0], legendre[n], err_msg=f'Mismatch of associated Legendre and Legendre for orthonormal normalization at n={n}')
+        associated_legendre.normalization = 'complement'
+        legendre.normalization = 'complement'
+        np.testing.assert_allclose(associated_legendre[n, 0], legendre[n], err_msg=f'Mismatch of associated Legendre and Legendre for complement normalization at n={n}')
+
         for m in range(-n, n + 1):
             scipy_norm = (2 * scipy.special.factorial(n + m) / (2 * n + 1) / scipy.special.factorial(n - m))**0.5
             scipy_value = scipy.special.lpmv(m, n, cosine_colatitude)
-            legendre.normalization = 'scipy'
-            np.testing.assert_allclose(scipy_value, legendre[n, m])
-            legendre.normalization = 'orthonormal'
-            np.testing.assert_allclose(scipy_value, legendre[n, m] * scipy_norm)
+            associated_legendre.normalization = 'scipy'
+            np.testing.assert_allclose(scipy_value, associated_legendre[n, m])
+            associated_legendre.normalization = 'orthonormal'
+            np.testing.assert_allclose(scipy_value, associated_legendre[n, m] * scipy_norm)
 
 
 def test_spherical_harmoics_values(order, colatitude, azimuth):
