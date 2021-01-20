@@ -167,7 +167,7 @@ class ColatitudeRotation:
                 out = expansions.Expansion(order=N, data=output_shape, wavenumber=wavenumber)
         elif expansion is out:
             raise NotImplementedError('Rotations cannot currently be applied in place')
-        if not inverse:
+        if inverse:
             for n in range(N + 1):
                 for p in range(-n, n + 1):
                     # Use a local temporary variable to accumulate the summed value.

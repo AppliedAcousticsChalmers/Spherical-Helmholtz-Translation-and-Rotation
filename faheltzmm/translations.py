@@ -298,7 +298,7 @@ class Translation:
 
     def apply(self, expansion, inverse=False):
         if not inverse:
-            return expansion.apply(self._rotation).apply(self._coaxial).apply(self._rotation, inverse=True)
+            return expansion.apply(self._rotation, inverse=True).apply(self._coaxial).apply(self._rotation)
         else:
             raise NotImplementedError('Inverse translations not implemented yet.')
 

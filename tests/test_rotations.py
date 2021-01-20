@@ -32,9 +32,9 @@ def test_value_equality(old_values, new_values):
 
 
 def test_inverse_rotations(old_coefficients, new_coefficients, inverse_rotation_coefficients, rotation_coefficients):
-    recalc_old_indirect = inverse_rotation_coefficients.apply(new_coefficients)
+    recalc_old_indirect = inverse_rotation_coefficients.apply(new_coefficients, inverse=True)
     np.testing.assert_allclose(recalc_old_indirect._data, old_coefficients._data)
-    recalc_old_direct = rotation_coefficients.apply(new_coefficients, inverse=True)
+    recalc_old_direct = rotation_coefficients.apply(new_coefficients)
     np.testing.assert_allclose(recalc_old_direct._data, old_coefficients._data)
 
 
@@ -88,7 +88,7 @@ def inverse_rotation_coefficients(order, new_z, old_z):
 
 @pytest.fixture(scope='module')
 def new_coefficients(old_coefficients, rotation_coefficients):
-    return rotation_coefficients.apply(old_coefficients)
+    return rotation_coefficients.apply(old_coefficients, inverse=True)
 
 
 @pytest.fixture(scope='module')
