@@ -240,3 +240,36 @@ def monopole(strength=1, order=0, wavenumber=1, position=None, domain='exterior'
     if position is not None:
         expansion = expansion.translate(order=order, position=position, domain=domain)
     return expansion
+
+
+def circular_ring(
+        order, radius, strength=1,
+        colatitude=0, azimuth=None, wavenumber=None, wavevector=None,
+        position=None, domain='exterior'):
+    r"""Create a circular ring source expansion.
+
+    The source strength relates to the far-field radiation characteristic of a
+    circular ring, as :math:`{q \over 4\pi} J_0(ka\sin\theta) \exp{ikr}` where
+    :math:`q` is the input source strength, :math:`J_0` is the zeroth order
+    Bessel function, :math:`k` is the wavenuber, :math:`a` is the radius of the
+    ring, :math:`r` is the distance from the source, and :math:`\theta` is the
+    angle between the position vector and the source normal.
+    """
+    if wavevector is not None:
+        wavenumber, colatitude, azimuth = coordinates.cartesian_2_spherical(wavevector)
+    expansion = ExteriorExpansion(order=order, wavenumber=wavenumber, data=np.broadcast(colatitude, azimuth))
+    strength = strength * wavenumber * 1j / 2
+    from scipy.special import spherical_jn, gamma
+    even_n = np.arange(0, order + 1, 2)
+    # values = np.pi * radius * spherical_jn(even_n, wavenumber * radius) * (2 * even_n + 1)**0.5 / (gamma(even_n / 2 + 1) * gamma(0.5 - even_n / 2))
+    values = strength * spherical_jn(even_n, wavenumber * radius) * (2 * even_n + 1)**0.5 / (gamma(even_n / 2 + 1) * gamma(0.5 - even_n / 2))
+    # TODO: This seems to give about the right shape, but the overall scale is not correct.
+    # We need to look at this derivation and compare ot to a derivation of the simple free-field solution in order to get
+    # the "strength" of the source.
+    for value, n in zip(values, even_n):
+        expansion[n, 0] = value
+    if colatitude != 0:
+        expansion = expansion.rotate(colatitude=colatitude, azimuth=azimuth)
+    if position is not None:
+        expansion = expansion.translate(position=position, domain=domain)
+    return expansion
