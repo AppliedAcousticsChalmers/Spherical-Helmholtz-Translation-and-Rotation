@@ -142,17 +142,20 @@ class Expansion:
             new_z_axis=new_z_axis, old_z_axis=old_z_axis
         ).apply(self)
 
-    def evaluate(self, position=None, radius=None, colatitude=None, azimuth=None):
+    def bases(self, position=None, radius=None, colatitude=None, azimuth=None):
         try:
             return self._base_cls(
                 order=self.order, wavenumber=self.wavenumber, position=position,
                 radius=radius, colatitude=colatitude, azimuth=azimuth
-            ).apply(self)
+            )
         except AttributeError as e:
             if "no attribute '_base_cls'" in str(e):
-                raise ValueError('Cannot evaluate expansion without a related base')
+                raise ValueError('Cannot get bases for expansion without a related base class')
             else:
                 raise e
+
+    def evaluate(self, position=None, radius=None, colatitude=None, azimuth=None):
+        return self.bases(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth).apply(self)
 
 
 class SphericalSurfaceExpansion(Expansion):
