@@ -1,8 +1,6 @@
 import numpy as np
 import faheltzmm.rotations
-import faheltzmm.generate
 import faheltzmm.coordinates
-import faheltzmm.indexing
 import pytest
 
 
@@ -33,26 +31,23 @@ def test_value_equality(old_values, new_values):
     np.testing.assert_allclose(new_values, old_values)
 
 
-def test_inverse_rotations(old_coefficients, new_coefficients, inverse_rotation_coefficients):
-    np.testing.assert_allclose(old_coefficients, np.einsum('mnp, nm -> np', inverse_rotation_coefficients, new_coefficients))
+def test_inverse_rotations(old_coefficients, new_coefficients, inverse_rotation_coefficients, rotation_coefficients):
+    recalc_old_indirect = inverse_rotation_coefficients.apply(new_coefficients, inverse=True)
+    np.testing.assert_allclose(recalc_old_indirect._data, old_coefficients._data)
+    recalc_old_direct = rotation_coefficients.apply(new_coefficients)
+    np.testing.assert_allclose(recalc_old_direct._data, old_coefficients._data)
 
 
 def test_angle_specification_rotation_coefficients(rotation_coefficients, axis_angles, order):
     beta, alpha, gamma = axis_angles
-    manual_coefficients = faheltzmm.rotations.rotation_coefficients(max_order=order, colatitude=beta, primary_azimuth=alpha, secondary_azimuth=np.pi - gamma)
-    np.testing.assert_allclose(manual_coefficients, rotation_coefficients)
+    manual_coefficients = faheltzmm.rotations.Rotation(order=order, colatitude=beta, azimuth=alpha, secondary_azimuth=np.pi - gamma)
+    np.testing.assert_allclose(manual_coefficients._data, rotation_coefficients._data)
 
 
 def test_inverse_rotation_coefficients(inverse_rotation_coefficients, axis_angles, order):
     beta, alpha, gamma = axis_angles
-    manual_inverse_coefficients = faheltzmm.rotations.rotation_coefficients(max_order=order, colatitude=beta, primary_azimuth=gamma, secondary_azimuth=np.pi - alpha)
-    np.testing.assert_allclose(manual_inverse_coefficients, inverse_rotation_coefficients)
-
-
-def test_rotate_func(old_coefficients, new_z, old_z, new_coefficients, rotation_coefficients):
-    np.testing.assert_allclose(new_coefficients, faheltzmm.rotations.rotate(old_coefficients, new_z_axis=new_z, old_z_axis=old_z))
-    np.testing.assert_allclose(new_coefficients, faheltzmm.rotations.rotate(old_coefficients, rotation_coefficients=rotation_coefficients))
-    np.testing.assert_allclose(old_coefficients, faheltzmm.rotations.rotate(new_coefficients, rotation_coefficients=rotation_coefficients, inverse=True))
+    manual_inverse_coefficients = faheltzmm.rotations.Rotation(order=order, colatitude=beta, azimuth=gamma, secondary_azimuth=np.pi - alpha)
+    np.testing.assert_allclose(manual_inverse_coefficients._data, inverse_rotation_coefficients._data)
 
 
 # ===================== Geometry and positions  =====================
@@ -76,43 +71,43 @@ def new_positions(new_z, old_z, old_positions):
 # ===================== Expansion coefficients  =====================
 @pytest.fixture(scope='module')
 def old_coefficients(order):
-    n_coeffs = (order + 1)**2
-    linear_coeffs = np.random.normal(size=n_coeffs) + 1j * np.random.normal(size=n_coeffs)
-    return faheltzmm.indexing.expansions(linear_coeffs, 'linear', 'natural')
+    coeffs = faheltzmm.expansions.Expansion(order=order)
+    coeffs._data = np.random.normal(size=len(coeffs._data)) + 1j * np.random.normal(size=len(coeffs._data))
+    return coeffs
 
 
 @pytest.fixture(scope='module')
 def rotation_coefficients(order, new_z, old_z):
-    return faheltzmm.rotations.rotation_coefficients(max_order=order, new_z_axis=new_z, old_z_axis=old_z)
+    return faheltzmm.rotations.Rotation(order=order, new_z_axis=new_z, old_z_axis=old_z)
 
 
 @pytest.fixture(scope='module')
 def inverse_rotation_coefficients(order, new_z, old_z):
-    return faheltzmm.rotations.rotation_coefficients(max_order=order, new_z_axis=old_z, old_z_axis=new_z)
+    return faheltzmm.rotations.Rotation(order=order, new_z_axis=old_z, old_z_axis=new_z)
 
 
 @pytest.fixture(scope='module')
 def new_coefficients(old_coefficients, rotation_coefficients):
-    return np.einsum('mnp, nm...->np...', rotation_coefficients, old_coefficients)
+    return rotation_coefficients.apply(old_coefficients, inverse=True)
 
 
 @pytest.fixture(scope='module')
 def old_bases(order, old_positions):
     _, colatitude, azimuth = faheltzmm.coordinates.cartesian_2_spherical(old_positions)
-    return faheltzmm.generate.spherical_harmonics_all(max_order=order, colatitude=colatitude, azimuth=azimuth)
+    return faheltzmm.bases.SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
 
 
 @pytest.fixture(scope='module')
 def new_bases(order, new_positions):
     _, colatitude, azimuth = faheltzmm.coordinates.cartesian_2_spherical(new_positions)
-    return faheltzmm.generate.spherical_harmonics_all(max_order=order, colatitude=colatitude, azimuth=azimuth)
+    return faheltzmm.bases.SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
 
 
 @pytest.fixture(scope='module')
 def old_values(old_coefficients, old_bases):
-    return np.einsum('nm, nm...', old_coefficients, old_bases)
+    return old_bases.apply(old_coefficients)
 
 
 @pytest.fixture(scope='module')
 def new_values(new_coefficients, new_bases):
-    return np.einsum('nm, nm...', new_coefficients, new_bases)
+    return new_bases.apply(new_coefficients)

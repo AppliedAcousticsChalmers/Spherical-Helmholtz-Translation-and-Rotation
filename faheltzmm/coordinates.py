@@ -59,7 +59,7 @@ def cartesian_2_trigonometric(cartesian_positions):
     cos_theta = np.clip(normalized[2], -1, 1)
     sin_theta = (1 - cos_theta**2)**0.5
     with np.errstate(divide='ignore', invalid='ignore'):
-        xy_projected = np.where(sin_theta == 0, 0, normalized[:2] / sin_theta)
+        xy_projected = np.where(sin_theta * r == 0, np.reshape([1, 0], [2] + [1] * np.ndim(sin_theta)), normalized[:2] / sin_theta)
     cos_phi = np.clip(xy_projected[0], -1, 1)
     sin_phi = np.clip(xy_projected[1], -1, 1)
     return np.stack([r, cos_theta, sin_theta, cos_phi, sin_phi], axis=0)
@@ -87,21 +87,21 @@ def spherical_2_cartesian(radius, colatitude, azimuth):
     return radius * np.stack([x, y, z], axis=0)
 
 
-def rotation_matrix(colatitude, primary_azimuth, secondary_azimuth):
+def rotation_matrix(colatitude, azimuth, secondary_azimuth):
     return np.array([
         [
-            np.cos(colatitude) * np.cos(secondary_azimuth) * np.cos(primary_azimuth) - np.sin(secondary_azimuth) * np.sin(primary_azimuth),
-            np.cos(colatitude) * np.cos(secondary_azimuth) * np.sin(primary_azimuth) + np.sin(secondary_azimuth) * np.cos(primary_azimuth),
+            np.cos(colatitude) * np.cos(secondary_azimuth) * np.cos(azimuth) - np.sin(secondary_azimuth) * np.sin(azimuth),
+            np.cos(colatitude) * np.cos(secondary_azimuth) * np.sin(azimuth) + np.sin(secondary_azimuth) * np.cos(azimuth),
             -np.sin(colatitude) * np.cos(secondary_azimuth),
         ],
         [
-            -np.cos(colatitude) * np.sin(secondary_azimuth) * np.cos(primary_azimuth) - np.cos(secondary_azimuth) * np.sin(primary_azimuth),
-            np.cos(secondary_azimuth) * np.cos(primary_azimuth) - np.cos(colatitude) * np.sin(secondary_azimuth) * np.sin(primary_azimuth),
+            -np.cos(colatitude) * np.sin(secondary_azimuth) * np.cos(azimuth) - np.cos(secondary_azimuth) * np.sin(azimuth),
+            np.cos(secondary_azimuth) * np.cos(azimuth) - np.cos(colatitude) * np.sin(secondary_azimuth) * np.sin(azimuth),
             np.sin(colatitude) * np.sin(secondary_azimuth),
         ],
         [
-            np.sin(colatitude) * np.cos(primary_azimuth),
-            np.sin(colatitude) * np.sin(primary_azimuth),
+            np.sin(colatitude) * np.cos(azimuth),
+            np.sin(colatitude) * np.sin(azimuth),
             np.cos(colatitude)
         ],
     ])
