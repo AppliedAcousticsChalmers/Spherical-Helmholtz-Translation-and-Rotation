@@ -180,7 +180,7 @@ class InteriorExpansion(Expansion):
 class ExteriorExpansion(Expansion):
     from .bases import SingularBase as _base_cls
 
-    def translate(self, order=None, position=None, radius=None, colatitude=None, azimuth=None, domain='extreior'):
+    def translate(self, order=None, position=None, radius=None, colatitude=None, azimuth=None, domain='exterior'):
         if domain == 'exterior':
             from .translations import ExteriorTranslation as TranslationCls
         elif domain == 'interior':
@@ -239,7 +239,8 @@ def monopole(strength=1, order=0, wavenumber=1, position=None, domain='exterior'
     source and :math:`k` is the wavenubmer.
     """
     strength = strength * wavenumber * 1j / (4 * np.pi)**0.5
-    expansion = ExteriorExpansion(order=0, data=[strength], wavenumber=wavenumber)
+    expansion = ExteriorExpansion(order=order, wavenumber=wavenumber)
+    expansion[0, 0] = strength
     if position is not None:
         expansion = expansion.translate(order=order, position=position, domain=domain)
     return expansion
