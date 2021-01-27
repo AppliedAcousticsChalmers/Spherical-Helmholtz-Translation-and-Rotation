@@ -1,4 +1,4 @@
-"""FaHeltzMM, (Fast Hemlholtz Multipole Methods) is designed to solve the Helmholtz equation in three dimensions."""
+"""SHeTaR, (Spherical Helmholtz Translation and Rotation), translations and rotations for solutions of the Helmholtz equation in spherical coordinates."""
 
 from . import _version
 __version__ = _version.__version__

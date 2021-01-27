@@ -310,6 +310,10 @@ class SphericalHarmonics:
 class SphericalBase:
     def __init__(self, order, position=None, wavenumber=None,
                  radius=None, colatitude=None, azimuth=None):
+        # TODO: The broadcasting breaks if the radius is not highest in dimention.
+        # E.g. radius.shape = (7, 1), colatitude.shape = (11, 1, 1), azimuth.shape = (13,), wavenumber.shape = (17,)
+        # will break in `__getitem__` since self._radial[...].shape = (17, 7, 1) but self._angular[...].shape = (11, 1, 13)
+        # To solve this we need to automatically add one extra dimention between the radius and the wavenumber to be able to fit the colatitude.
         if position is not None:
             radial_shape = np.broadcast(position[0])
             colatitude_shape = np.broadcast(position[0])
