@@ -1,4 +1,4 @@
-import faheltzmm.bases
+import shetar.bases
 import scipy.special
 import numpy as np
 import pytest
@@ -59,8 +59,8 @@ def wavenumber(position):
 
 
 def test_legendre_values(order, cosine_colatitude):
-    associated_legendre = faheltzmm.bases.AssociatedLegendrePolynomials(order=order, x=cosine_colatitude)
-    legendre = faheltzmm.bases.LegendrePolynomials(order=order, x=cosine_colatitude)
+    associated_legendre = shetar.bases.AssociatedLegendrePolynomials(order=order, x=cosine_colatitude)
+    legendre = shetar.bases.LegendrePolynomials(order=order, x=cosine_colatitude)
     for n in range(order + 1):
         associated_legendre.normalization = 'scipy'
         legendre.normalization = 'scipy'
@@ -86,7 +86,7 @@ def test_spherical_harmoics_values(order, colatitude, azimuth):
         colatitude, azimuth = np.broadcast_arrays(colatitude, azimuth)
     except ValueError:
         colatitude = colatitude.reshape(colatitude.shape + (1,) * np.ndim(azimuth))
-    sh = faheltzmm.bases.SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
+    sh = shetar.bases.SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
     for n in range(order + 1):
         for m in range(-n, n + 1):
             np.testing.assert_allclose(
@@ -102,7 +102,7 @@ def test_regular_base_values(order, position, wavenumber):
     colatitude = np.arccos(position[2] / radius)
     azimuth = np.arctan2(position[1], position[0])
 
-    implemented = faheltzmm.bases.RegularBase(order=order, position=position, wavenumber=wavenumber)
+    implemented = shetar.bases.RegularBase(order=order, position=position, wavenumber=wavenumber)
     for n in range(order + 1):
         radial = scipy.special.spherical_jn(n, kr)
         for m in range(-n, n + 1):
@@ -119,7 +119,7 @@ def test_singular_base_values(order, position, wavenumber):
     colatitude = np.arccos(position[2] / radius)
     azimuth = np.arctan2(position[1], position[0])
 
-    implemented = faheltzmm.bases.SingularBase(order=order, position=position, wavenumber=wavenumber)
+    implemented = shetar.bases.SingularBase(order=order, position=position, wavenumber=wavenumber)
     for n in range(order + 1):
         radial = scipy.special.spherical_jn(n, kr) + 1j * scipy.special.spherical_yn(n, kr)
         for m in range(-n, n + 1):
@@ -131,9 +131,9 @@ def test_singular_base_values(order, position, wavenumber):
 
 
 def test_dual_base(order, position, wavenumber):
-    regular = faheltzmm.bases.RegularBase(order=order, position=position, wavenumber=wavenumber)
-    singular = faheltzmm.bases.SingularBase(order=order, position=position, wavenumber=wavenumber)
-    dual = faheltzmm.bases.DualBase(order=order, position=position, wavenumber=wavenumber)
+    regular = shetar.bases.RegularBase(order=order, position=position, wavenumber=wavenumber)
+    singular = shetar.bases.SingularBase(order=order, position=position, wavenumber=wavenumber)
+    dual = shetar.bases.DualBase(order=order, position=position, wavenumber=wavenumber)
 
     for n in range(order + 1):
         for m in range(-n, n + 1):

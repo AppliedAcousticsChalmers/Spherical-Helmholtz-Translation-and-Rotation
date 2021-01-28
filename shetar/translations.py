@@ -219,6 +219,9 @@ class CoaxialTranslation:
             if not np.allclose(wavenumber, self.wavenumber):
                 raise ValueError('Cannot apply translation to expansion of different wavenuber')
 
+        # TODO: Limit the order when the input expansion is lower order
+        # TODO: Limit the order when the output expansion is lower order
+        # TODO: output type for inverse translations? If the translation is exterior to interior, what should the inverse translation do?
         if out is None:
             self_shape = self.shape
             expansion_shape = np.shape(expansion)

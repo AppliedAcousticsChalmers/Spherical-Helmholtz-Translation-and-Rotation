@@ -1,6 +1,6 @@
 import numpy as np
-import faheltzmm.rotations
-import faheltzmm.coordinates
+import shetar.rotations
+import shetar.coordinates
 import pytest
 
 
@@ -40,13 +40,13 @@ def test_inverse_rotations(old_coefficients, new_coefficients, inverse_rotation_
 
 def test_angle_specification_rotation_coefficients(rotation_coefficients, axis_angles, order):
     beta, alpha, gamma = axis_angles
-    manual_coefficients = faheltzmm.rotations.Rotation(order=order, colatitude=beta, azimuth=alpha, secondary_azimuth=np.pi - gamma)
+    manual_coefficients = shetar.rotations.Rotation(order=order, colatitude=beta, azimuth=alpha, secondary_azimuth=np.pi - gamma)
     np.testing.assert_allclose(manual_coefficients._data, rotation_coefficients._data)
 
 
 def test_inverse_rotation_coefficients(inverse_rotation_coefficients, axis_angles, order):
     beta, alpha, gamma = axis_angles
-    manual_inverse_coefficients = faheltzmm.rotations.Rotation(order=order, colatitude=beta, azimuth=gamma, secondary_azimuth=np.pi - alpha)
+    manual_inverse_coefficients = shetar.rotations.Rotation(order=order, colatitude=beta, azimuth=gamma, secondary_azimuth=np.pi - alpha)
     np.testing.assert_allclose(manual_inverse_coefficients._data, inverse_rotation_coefficients._data)
 
 
@@ -54,36 +54,36 @@ def test_inverse_rotation_coefficients(inverse_rotation_coefficients, axis_angle
 @pytest.fixture(scope="module")
 def new_z(axis_angles):
     beta, alpha, gamma = axis_angles
-    return faheltzmm.coordinates.spherical_2_cartesian(1, beta, alpha)
+    return shetar.coordinates.spherical_2_cartesian(1, beta, alpha)
 
 
 @pytest.fixture(scope="module")
 def old_z(axis_angles):
     beta, alpha, gamma = axis_angles
-    return faheltzmm.coordinates.spherical_2_cartesian(1, beta, gamma)
+    return shetar.coordinates.spherical_2_cartesian(1, beta, gamma)
 
 
 @pytest.fixture(scope='module')
 def new_positions(new_z, old_z, old_positions):
-    return np.einsum('ij, j...-> i...', faheltzmm.coordinates.z_axes_rotation_matrix(new_axis=new_z, old_axis=old_z), old_positions)
+    return np.einsum('ij, j...-> i...', shetar.coordinates.z_axes_rotation_matrix(new_axis=new_z, old_axis=old_z), old_positions)
 
 
 # ===================== Expansion coefficients  =====================
 @pytest.fixture(scope='module')
 def old_coefficients(order):
-    coeffs = faheltzmm.expansions.Expansion(order=order)
+    coeffs = shetar.expansions.Expansion(order=order)
     coeffs._data = np.random.normal(size=len(coeffs._data)) + 1j * np.random.normal(size=len(coeffs._data))
     return coeffs
 
 
 @pytest.fixture(scope='module')
 def rotation_coefficients(order, new_z, old_z):
-    return faheltzmm.rotations.Rotation(order=order, new_z_axis=new_z, old_z_axis=old_z)
+    return shetar.rotations.Rotation(order=order, new_z_axis=new_z, old_z_axis=old_z)
 
 
 @pytest.fixture(scope='module')
 def inverse_rotation_coefficients(order, new_z, old_z):
-    return faheltzmm.rotations.Rotation(order=order, new_z_axis=old_z, old_z_axis=new_z)
+    return shetar.rotations.Rotation(order=order, new_z_axis=old_z, old_z_axis=new_z)
 
 
 @pytest.fixture(scope='module')
@@ -93,14 +93,14 @@ def new_coefficients(old_coefficients, rotation_coefficients):
 
 @pytest.fixture(scope='module')
 def old_bases(order, old_positions):
-    _, colatitude, azimuth = faheltzmm.coordinates.cartesian_2_spherical(old_positions)
-    return faheltzmm.bases.SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
+    _, colatitude, azimuth = shetar.coordinates.cartesian_2_spherical(old_positions)
+    return shetar.bases.SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
 
 
 @pytest.fixture(scope='module')
 def new_bases(order, new_positions):
-    _, colatitude, azimuth = faheltzmm.coordinates.cartesian_2_spherical(new_positions)
-    return faheltzmm.bases.SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
+    _, colatitude, azimuth = shetar.coordinates.cartesian_2_spherical(new_positions)
+    return shetar.bases.SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
 
 
 @pytest.fixture(scope='module')

@@ -1,7 +1,7 @@
 import numpy as np
-import faheltzmm.translations
-import faheltzmm.coordinates
-import faheltzmm.bases
+import shetar.translations
+import shetar.coordinates
+import shetar.bases
 import pytest
 
 
@@ -51,8 +51,8 @@ def input_order(output_order):
 def source_expansion(input_order, num_initial_sources):
     source_amplitudes = np.random.normal(size=num_initial_sources) + 1j * np.random.normal(size=num_initial_sources)
     source_positions = np.random.normal(loc=0, scale=1e-3, size=(3, num_initial_sources))
-    source_expansion = faheltzmm.expansions.Expansion(data=source_amplitudes[None, :]).apply(
-        faheltzmm.translations.InteriorTranslation(
+    source_expansion = shetar.expansions.Expansion(data=source_amplitudes[None, :]).apply(
+        shetar.translations.InteriorTranslation(
             input_order=0, output_order=input_order,
             position=source_positions, wavenumber=1
         )
@@ -64,7 +64,7 @@ def source_expansion(input_order, num_initial_sources):
 
 @pytest.fixture(scope='module')
 def original_bases(input_order, field_points, wavenumber):
-    original_bases = faheltzmm.bases.SingularBase(order=input_order, position=field_points, wavenumber=wavenumber)
+    original_bases = shetar.bases.SingularBase(order=input_order, position=field_points, wavenumber=wavenumber)
     return original_bases
 
 
@@ -82,13 +82,13 @@ def translated_field_points(field_points, new_origin):
 
 @pytest.fixture(scope='module')
 def translated_bases(translated_field_points, output_order, wavenumber):
-    translated_bases = faheltzmm.bases.SingularBase(order=output_order, position=translated_field_points, wavenumber=wavenumber)
+    translated_bases = shetar.bases.SingularBase(order=output_order, position=translated_field_points, wavenumber=wavenumber)
     return translated_bases
 
 
 @pytest.fixture(scope='module')
 def translated_expansion(source_expansion, new_origin, output_order, wavenumber):
-    translation = faheltzmm.translations.ExteriorTranslation(
+    translation = shetar.translations.ExteriorTranslation(
         input_order=source_expansion.order, output_order=output_order,
         position=-new_origin, wavenumber=wavenumber
     )
