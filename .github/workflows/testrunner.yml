@@ -1,4 +1,4 @@
-name: Test-runner
+name: Tests
 on: push
 jobs:
   tests:
@@ -19,7 +19,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install .
-    - name: run tests
+    - name: Run tests
       run: |
         pip install pytest pytest-cov
         pytest
