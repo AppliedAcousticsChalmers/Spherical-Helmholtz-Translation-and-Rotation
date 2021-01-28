@@ -19,5 +19,7 @@ jobs:
         python -m pip installl --upgrade pip
         pip install -r requirements.txt
         pip install .
-    - run: |
-      pytest
+    - name: run tests
+      run: |
+        pip install pytest pytest-cov
+        pytest
