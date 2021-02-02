@@ -1,6 +1,54 @@
 """Module to handle coordinate transforms."""
 
 import numpy as np
+import abc
+
+
+class Coordinate(abc.ABC):
+    @classmethod
+    def parse_args(cls, coordinate):
+        if isinstance(coordinate, Coordinate):
+            return cls.from_coordinate(coordinate)
+
+    @classmethod
+    @abc.abstractmethod
+    def from_coordinate(cls, coordinate):
+        return coordinate
+
+    def __init__(self):
+        self.shapes = type(self)._ShapeClass(self)
+
+    @property
+    def shape(self):
+        return self.shapes.shape
+
+    @property
+    def ndim(self):
+        return self.shapes.ndim
+
+    class _ShapeClass(abc.ABC):
+        @staticmethod
+        def broadcast_shapes(*shapes, output='new'):
+            ndim = max(len(s) for s in shapes)
+            padded_shapes = [(1,) * (ndim - len(s)) + s for s in shapes]
+            out_shape = [max(s) for s in zip(*padded_shapes)]
+            if not all([dim == 1 or dim == out_dim for dims, out_dim in zip(zip(*padded_shapes), out_shape) for dim in dims]):
+                raise ValueError(f"Shapes {shapes} cannot be broadcast together")
+            if output == 'new':
+                return tuple(out_shape)
+            elif output == 'reshape':
+                return padded_shapes
+
+        def __init__(self, owner):
+            self.owner = owner
+
+        @property
+        @abc.abstractmethod
+        def shape(self):
+            pass
+
+        def ndim(self):
+            return len(self.shape)
 
 
 def cartesian_2_spherical(cartesian_positions):
