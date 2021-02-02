@@ -109,14 +109,12 @@ class SpatialCoordinate(Coordinate):
 
     @property
     def cartesian_mesh(self):
-        return np.stack(self.xyz, axis=-1)
+        xyz = np.meshgrid(self.x, self.y, self.z, indexing='ij', sparse=False)
+        return np.stack(xyz, axis=-1)
 
     @property
     def xyz(self):
-        if self.automesh:
-            return np.meshgrid(self.x, self.y, self.z, indexing='ij')
-        else:
-            return self.x, self.y, self.z
+        return self.x, self.y, self.z
 
     @property
     @abc.abstractmethod
@@ -135,14 +133,7 @@ class SpatialCoordinate(Coordinate):
 
     @property
     def radius_colatitude_azimuth(self):
-        if self.automesh:
-            return np.meshgrid(self.radius, self.colatitude, self.azimuth, indexing='ij')
-        else:
-            return self.radius, self.colatitude, self.azimuth
-
-    @property
-    def spherical_mesh(self):
-        return np.stack(self.radius_colatitude_azimuth, axis=-1)
+        return self.radius, self.colatitude, self.azimuth
 
     class _ShapeClass(Coordinate._ShapeClass):
         @property
@@ -182,6 +173,277 @@ class SpatialCoordinate(Coordinate):
         @property
         def spherical_mesh(self):
             return self.broadcast_shapes(self.radius, self.colatitude, self.azimuth)
+
+
+class _CartesianConverter(SpatialCoordinate):
+    @property
+    def radius(self):
+        return (self.x**2 + self.y**2 + self.z**2)**0.5
+
+    @property
+    def colatitude(self):
+        with np.errstate(invalid='ignore'):
+            r = self.radius
+            return np.arccos(np.where(r == 0, 0, self.z / r))
+
+    @property
+    def azimuth(self):
+        return np.arctan2(self.y, self.x)
+
+    @property
+    def spherical_mesh(self):
+        return np.stack(np.broadcast_arrays(self.radius, self.colatitude, self.azimuth), axis=-1).squeeze()
+
+    class _ShapeClass(SpatialCoordinate._ShapeClass):
+        @property
+        def radius(self):
+            return self.broadcast_shapes(self.x, self.y, self.z)
+
+        @property
+        def colatitude(self):
+            return self.broadcast_shapes(self.radius, self.z)
+
+        @property
+        def azimuth(self):
+            return self.broadcast_shapes(self.x, self.y)
+
+
+class _SphericalConverter(SpatialCoordinate):
+    @property
+    def x(self):
+        return self.radius * np.sin(self.colatitude) * np.cos(self.azimuth)
+
+    @property
+    def y(self):
+        return self.radius * np.sin(self.colatitude) * np.sin(self.azimuth)
+
+    @property
+    def z(self):
+        return self.radius * np.cos(self.colatitude)
+
+    @property
+    def cartesian_mesh(self):
+        return np.stack(np.broadcast_arrays(self.x, self.y, self.z), axis=-1).squeeze()
+
+    class _ShapeClass(SpatialCoordinate._ShapeClass):
+        @property
+        def x(self):
+            return self.broadcast_shapes(self.radius, self.colatitude, self.azimuth)
+
+        @property
+        def y(self):
+            return self.broadcast_shapes(self.radius, self.colatitude, self.azimuth)
+
+        @property
+        def z(self):
+            return self.broadcast_shapes(self.radius, self.colatitude)
+
+
+class Cartesian(_CartesianConverter):
+
+    @classmethod
+    def from_coordinate(cls, coordinate):
+        return cls(x=coordinate.x, y=coordinate.y, z=coordinate.z)
+
+    def __init__(self, x=0, y=0, z=0, **kwargs):
+        super().__init__(**kwargs)
+        self._x = np.asarray(x)
+        self._y = np.asarray(y)
+        self._z = np.asarray(z)
+
+    def copy(self, deep=False):
+        if deep:
+            return type(self)(x=self._x.copy(), y=self._y.copy(), z=self._z.copy(), automesh=self.automesh)
+        else:
+            return type(self)(x=self._x, y=self._y, z=self._z, automesh=self.automesh)
+
+    @property
+    def x(self):
+        return np.reshape(self._x, self.shapes.x)
+
+    @property
+    def y(self):
+        return np.reshape(self._y, self.shapes.y)
+
+    @property
+    def z(self):
+        return np.reshape(self._z, self.shapes.z)
+
+    @property
+    def cartesian_mesh(self):
+        return np.stack(np.meshgrid(self.x, self.y, self.x, indexing='ij', sparse=False), axis=-1).squeeze()
+
+    class _ShapeClass(_CartesianConverter._ShapeClass):
+        @property
+        def x(self):
+            if self.owner.automesh:
+                return np.shape(self.owner._x) + (1,) * (np.ndim(self.owner._y) + np.ndim(self.owner._z))
+            else:
+                return np.shape(self.owner._x)
+
+        @property
+        def y(self):
+            if self.owner.automesh:
+                return (1,) * np.ndim(self.owner._y) + np.shape(self.owner._y) + (1,) * np.ndim(self.owner._z)
+            else:
+                return np.shape(self.owner._y)
+
+        @property
+        def z(self):
+            if self.owner.automesh:
+                return (1,) * (np.ndim(self.owner._x) + np.ndim(self.owner._y)) + np.shape(self.owner._z)
+            else:
+                return np.shape(self.owner._z)
+
+        @property
+        def shape(self):
+            return self.broadcast_shapes(self.x, self.y, self.z)
+
+
+class CartesianMesh(_CartesianConverter):
+    @classmethod
+    def from_coordinate(cls, coordinate):
+        return cls(mesh=coordinate.cartesian_mesh)
+
+    def __init__(self, mesh, **kwargs):
+        kwargs['automesh'] = False  # Should not apply meshing to a mesh again.
+        super().__init__(**kwargs)
+        self._cartesian_mesh = np.asarray(mesh)
+
+    def copy(self, deep=False):
+        if deep:
+            return type(self)(mesh=self._cartesian_mesh.copy(), automesh=self.automesh)
+        else:
+            return type(self)(mesh=self._cartesian_mesh, automesh=self.automesh)
+
+    @property
+    def x(self):
+        return self._cartesian_mesh[..., 0]
+
+    @property
+    def y(self):
+        return self._cartesian_mesh[..., 1]
+
+    @property
+    def z(self):
+        return self._cartesian_mesh[..., 2]
+
+    @property
+    def cartesian_mesh(self):
+        return self._cartesian_mesh
+
+    class _ShapeClass(_CartesianConverter._ShapeClass):
+        def shape(self):
+            return np.shape(self.owner._cartesian_mesh)[:-1]
+        x = property(shape)
+        y = property(shape)
+        z = property(shape)
+        shape = property(shape)
+
+
+class Spherical(_SphericalConverter):
+    @classmethod
+    def from_coordinate(cls, coordinate):
+        return cls(radius=coordinate.radius, colatitude=coordinate.colatitude, azimuth=coordinate.azimuth)
+
+    def __init__(self, radius=1, colatitude=np.pi / 2, azimuth=0, **kwargs):
+        super().__init__(**kwargs)
+        self._radius = np.asarray(radius)
+        self._colatitude = np.asarray(colatitude)
+        self._azimuth = np.asarray(azimuth)
+
+    def copy(self, deep=False):
+        if deep:
+            return type(self)(radius=self._radius.copy(), colatitude=self._colatitude.copy(), azimuth=self._azimuth.copy(), automesh=self.automesh)
+        else:
+            return type(self)(radius=self._radius, colatitude=self._colatitude, azimuth=self._azimuth, automesh=self.automesh)
+
+    @property
+    def radius(self):
+        return np.reshape(self._radius, self.shapes.radius)
+
+    @property
+    def colatitude(self):
+        return np.reshape(self._colatitude, self.shapes.colatitude)
+
+    @property
+    def azimuth(self):
+        return np.reshape(self._azimuth, self.shapes.azimuth)
+
+    @property
+    def spherical_mesh(self):
+        return np.stack(np.meshgrid(self.radius, self.colatitude, self.azimuth, indexing='ij', sparse=False), axis=-1).squeeze()
+
+    class _ShapeClass(_SphericalConverter._ShapeClass):
+        @property
+        def radius(self):
+            if self.owner.automesh:
+                return np.shape(self.owner._radius) + (1,) * (np.ndim(self.owner._colatitude) + np.ndim(self.owner._azimuth))
+            else:
+                return np.shape(self.owner._radius)
+
+        @property
+        def colatitude(self):
+            if self.owner.automesh:
+                return (1,) * np.ndim(self.owner._radius) + np.shape(self.owner._colatitude) + (1,) * np.ndim(self.owner._azimuth)
+            else:
+                return np.shape(self.owner._colatitude)
+
+        @property
+        def azimuth(self):
+            if self.owner.automesh:
+                return (1,) * (np.ndim(self.owner._radius) + np.ndim(self.owner._colatitude)) + np.shape(self.owner._azimuth)
+            else:
+                return np.shape(self.owner._azimuth)
+
+        @property
+        def shape(self):
+            return self.broadcast_shapes(self.radius, self.colatitude, self.azimuth)
+
+
+class SphericalMesh(_SphericalConverter):
+    @classmethod
+    def from_coordinate(cls, coordinate):
+        return cls(mesh=coordinate.spherical_mesh)
+
+    def __init__(self, mesh, **kwargs):
+        kwargs['automesh'] = False  # Should not apply meshing to a mesh again.
+        super().__init__(**kwargs)
+        self._spherical_mesh = np.asarray(mesh)
+
+    def copy(self, deep=False):
+        if deep:
+            return type(self)(mesh=self._spherical_mesh.copy(), automesh=self.automesh)
+        else:
+            return type(self)(mesh=self._spherical_mesh, automesh=self.automesh)
+
+    @property
+    def radius(self):
+        return self._spherical_mesh[..., 0]
+
+    @property
+    def colatitude(self):
+        return self._spherical_mesh[..., 1]
+
+    @property
+    def azimuth(self):
+        return self._spherical_mesh[..., 2]
+
+    @property
+    def spherial_mesh(self):
+        return self._spherial_mesh
+
+    @property
+    def shape(self):
+        return np.shape(self._spherical_mesh)[:-1]
+
+    class _ShapeClass(_SphericalConverter._ShapeClass):
+        def shape(self):
+            return np.shape(self.owner._spherical_mesh)[:-1]
+        radius = property(shape)
+        colatitude = property(shape)
+        azimuth = property(shape)
+        shape = property(shape)
 
 
 def cartesian_2_spherical(cartesian_positions):
