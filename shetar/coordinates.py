@@ -51,6 +51,139 @@ class Coordinate(abc.ABC):
             return len(self.shape)
 
 
+class NonspatialCoordinate(Coordinate):
+    def __init__(self, x, **kwargs):
+        super().__init__(**kwargs)
+        self._x = np.asarray(x)
+
+    @classmethod
+    def from_coordinate(cls, coordinate):
+        if type(coordinate) is not cls:
+            raise ValueError(f'Cannot cast a `{coordinate.__class__.__name__}` to {cls.__name__}')
+        return coordinate
+
+    class _ShapeClass(Coordinate._ShapeClass):
+        @property
+        def shape(self):
+            return np.shape(self.owner._x)
+
+
+class SpatialCoordinate(Coordinate):
+    @classmethod
+    def parse_args(cls, position=None, *,
+                   x=None, y=None, z=None, cartesian_mesh=None,
+                   radius=None, colatitude=None, azimuth=None, spherical_mesh=None,
+                   **kwargs):
+        obj = super().parse_args(position)
+        if obj is not None:
+            return obj
+        if (x is not None) or (y is not None) or (z is not None):
+            return Cartesian(x=x, y=y, z=z, **kwargs)
+        if (radius is not None) or (colatitude is not None) or (azimuth is not None):
+            return Spherical(radius=radius, colatitude=colatitude, azimuth=azimuth, **kwargs)
+        if position is not None:
+            return CartesianMesh(mesh=position, **kwargs)
+        if cartesian_mesh is not None:
+            return CartesianMesh(mesh=cartesian_mesh, **kwargs)
+        if spherical_mesh is not None:
+            return SphericalMesh(mesh=spherical_mesh, **kwargs)
+
+    def __init__(self, *args, automesh=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.automesh = automesh
+
+    @property
+    @abc.abstractmethod
+    def x(self):
+        pass
+
+    @property
+    @abc.abstractmethod
+    def y(self):
+        pass
+
+    @property
+    @abc.abstractmethod
+    def z(self):
+        pass
+
+    @property
+    def cartesian_mesh(self):
+        return np.stack(self.xyz, axis=-1)
+
+    @property
+    def xyz(self):
+        if self.automesh:
+            return np.meshgrid(self.x, self.y, self.z, indexing='ij')
+        else:
+            return self.x, self.y, self.z
+
+    @property
+    @abc.abstractmethod
+    def radius(self):
+        pass
+
+    @property
+    @abc.abstractmethod
+    def colatitude(self):
+        pass
+
+    @property
+    @abc.abstractmethod
+    def azimuth(self):
+        pass
+
+    @property
+    def radius_colatitude_azimuth(self):
+        if self.automesh:
+            return np.meshgrid(self.radius, self.colatitude, self.azimuth, indexing='ij')
+        else:
+            return self.radius, self.colatitude, self.azimuth
+
+    @property
+    def spherical_mesh(self):
+        return np.stack(self.radius_colatitude_azimuth, axis=-1)
+
+    class _ShapeClass(Coordinate._ShapeClass):
+        @property
+        @abc.abstractmethod
+        def x(self):
+            pass
+
+        @property
+        @abc.abstractmethod
+        def y(self):
+            pass
+
+        @property
+        @abc.abstractmethod
+        def z(self):
+            pass
+
+        @property
+        def cartesian_mesh(self):
+            return self.broadcast_shapes(self.x, self.y, self.z)
+
+        @property
+        @abc.abstractmethod
+        def radius(self):
+            pass
+
+        @property
+        @abc.abstractmethod
+        def colatitude(self):
+            pass
+
+        @property
+        @abc.abstractmethod
+        def azimuth(self):
+            pass
+
+        @property
+        def spherical_mesh(self):
+            return self.broadcast_shapes(self.radius, self.colatitude, self.azimuth)
+
+
 def cartesian_2_spherical(cartesian_positions):
     """Convert a cartesian position to the spherical variables.
 
