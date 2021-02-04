@@ -6,24 +6,56 @@ test_potisions = [
     [0, 0, 0],
     [0.5, 0, 0], [0, 0.5, 0], [0, 0, 0.5],
     [-0.5, 0, 0], [0, -0.5, 0], [0, 0, -0.5],
-    np.random.normal(size=(3, 5)), np.random.normal(size=(3, 5, 7)),
+    np.random.normal(size=(5, 3)), np.random.normal(size=(5, 7, 3)),
 ]
 twice_random = (v for _ in iter(int, 1) for v in [np.random.normal()] * 2)
 
 
-@pytest.mark.parametrize("position", test_potisions)
-def test_spherical_invertability(position):
-    spherical_pos = shetar.coordinates.cartesian_2_spherical(position)
-    np.testing.assert_allclose(position, shetar.coordinates.spherical_2_cartesian(*spherical_pos), rtol=1e-6, atol=1e-12)
+@pytest.fixture(scope='module', params=[
+    [0, 0, 0],
+    [0.5, 0, 0], [0, 0.5, 0], [0, 0, 0.5],
+    [-0.5, 0, 0], [0, -0.5, 0], [0, 0, -0.5],
+    np.random.normal(size=(5, 3)), np.random.normal(size=(5, 7, 3)),
+])
+def cartesian_mesh(request):
+    return np.asarray(request.param)
 
 
-@pytest.mark.parametrize("position", test_potisions)
-def test_trigonometric_invertability(position):
-    r, cos_theta, sin_theta, cos_phi, sin_phi = shetar.coordinates.cartesian_2_trigonometric(position)
-    x = r * sin_theta * cos_phi
-    y = r * sin_theta * sin_phi
-    z = r * cos_theta
-    np.testing.assert_allclose(position, np.stack([x, y, z], axis=0), rtol=1e-6, atol=1e-12)
+@pytest.fixture(scope='module')
+def x(cartesian_mesh):
+    return cartesian_mesh[..., 0]
+
+
+@pytest.fixture(scope='module')
+def y(cartesian_mesh):
+    return cartesian_mesh[..., 1]
+
+
+@pytest.fixture(scope='module')
+def z(cartesian_mesh):
+    return cartesian_mesh[..., 2]
+
+
+@pytest.fixture(scope='module')
+def radius(x, y, z):
+    return (x**2 + y**2 + z**2)**0.5
+
+
+@pytest.fixture(scope='module')
+def colatitude(z, radius):
+    clipped = np.clip(z / radius, -1, 1)
+    replaced = np.nan_to_num(clipped, nan=0, neginf=0, posinf=0)
+    return np.arccos(replaced)
+
+
+@pytest.fixture(scope='module')
+def azimuth(x, y):
+    return np.arctan2(y, x)
+
+
+@pytest.fixture(scope='module')
+def spherical_mesh(radius, colatitude, azimuth):
+    return np.stack([radius, colatitude, azimuth], axis=-1)
 
 
 @pytest.mark.parametrize("original, target, colatitude, azimuth, secondary_azimuth", [
@@ -65,22 +97,41 @@ def test_trigonometric_invertability(position):
     ([0, 0, -1], [0, 0, 1], np.pi, np.random.normal(), np.random.normal()), ([0, 0, -1], [0, 0, -1], 0, np.random.normal(), np.random.normal()),
 ])
 def test_axis_rotations(original, target, colatitude, azimuth, secondary_azimuth):
-    rotation_matrix = shetar.coordinates.rotation_matrix(colatitude=colatitude, azimuth=azimuth, secondary_azimuth=secondary_azimuth)
-    np.testing.assert_allclose(rotation_matrix.T @ original, target, atol=1e-15)
+    rotation = shetar.coordinates.Rotation.parse_args(colatitude=colatitude, azimuth=azimuth, secondary_azimuth=secondary_azimuth)
+    calculated = rotation.apply(original).cartesian_mesh
+    np.testing.assert_allclose(calculated, target, atol=1e-15)
 
 
-@pytest.mark.parametrize('beta', np.random.uniform(0, np.pi, 3))
-@pytest.mark.parametrize('alpha', np.random.uniform(0, 2 * np.pi, 3))
-@pytest.mark.parametrize('mu', np.random.uniform(0, 2 * np.pi, 3))
-def test_z_axis_rotations(beta, alpha, mu):
-    Q = shetar.coordinates.rotation_matrix(beta, alpha, mu)
-    old_axis = Q[:, 2]  # The coordinates of the old axis expressed in the new system.
-    new_axis = Q[2]  # The coordinates of the new axis expressed in the old system
+def compare_coordinate(coord, cartesian_mesh, x, y, z, radius, colatitude, azimuth, spherical_mesh):
+    np.testing.assert_allclose(cartesian_mesh, coord.cartesian_mesh, atol=1e-16)
+    np.testing.assert_allclose(x, coord.x, atol=1e-16)
+    np.testing.assert_allclose(y, coord.y, atol=1e-16)
+    np.testing.assert_allclose(z, coord.z, atol=1e-16)
+    np.testing.assert_allclose(radius, coord.radius, atol=1e-16)
+    np.testing.assert_allclose(colatitude, coord.colatitude, atol=1e-16)
+    np.testing.assert_allclose(azimuth, coord.azimuth, atol=1e-16)
+    np.testing.assert_allclose(spherical_mesh, coord.spherical_mesh, atol=1e-16)
 
-    Q_from_axes = shetar.coordinates.z_axes_rotation_matrix(new_axis=new_axis, old_axis=old_axis)
-    np.testing.assert_allclose(Q, Q_from_axes)
-    beta, alpha, mu = shetar.coordinates.z_axes_rotation_angles(new_axis=new_axis, old_axis=old_axis)
-    beta_inv, alpha_inv, mu_inv = shetar.coordinates.z_axes_rotation_angles(new_axis=old_axis, old_axis=new_axis)
-    np.testing.assert_allclose(beta, beta_inv)
-    np.testing.assert_allclose(alpha_inv, np.pi - mu)
-    np.testing.assert_allclose(mu_inv, np.pi - alpha)
+
+def test_CartesianMesh(cartesian_mesh, x, y, z, radius, colatitude, azimuth, spherical_mesh):
+    coord = shetar.coordinates.SpatialCoordinate.parse_args(cartesian_mesh=cartesian_mesh)
+    assert type(coord) is shetar.coordinates.CartesianMesh
+    compare_coordinate(coord, cartesian_mesh, x, y, z, radius, colatitude, azimuth, spherical_mesh)
+
+
+def test_Cartesian(cartesian_mesh, x, y, z, radius, colatitude, azimuth, spherical_mesh):
+    coord = shetar.coordinates.SpatialCoordinate.parse_args(x=x, y=y, z=z)
+    assert type(coord) is shetar.coordinates.Cartesian
+    compare_coordinate(coord, cartesian_mesh, x, y, z, radius, colatitude, azimuth, spherical_mesh)
+
+
+def test_Spherical(cartesian_mesh, x, y, z, radius, colatitude, azimuth, spherical_mesh):
+    coord = shetar.coordinates.SpatialCoordinate.parse_args(radius=radius, colatitude=colatitude, azimuth=azimuth)
+    assert type(coord) is shetar.coordinates.Spherical
+    compare_coordinate(coord, cartesian_mesh, x, y, z, radius, colatitude, azimuth, spherical_mesh)
+
+
+def test_SphericalMesh(cartesian_mesh, x, y, z, radius, colatitude, azimuth, spherical_mesh):
+    coord = shetar.coordinates.SpatialCoordinate.parse_args(spherical_mesh=spherical_mesh)
+    assert type(coord) is shetar.coordinates.SphericalMesh
+    compare_coordinate(coord, cartesian_mesh, x, y, z, radius, colatitude, azimuth, spherical_mesh)
