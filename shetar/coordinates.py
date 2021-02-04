@@ -11,12 +11,17 @@ class Coordinate(abc.ABC):
             return cls.from_coordinate(coordinate)
 
     @classmethod
-    @abc.abstractmethod
     def from_coordinate(cls, coordinate):
+        if not isinstance(coordinate, Coordinate):
+            raise ValueError(f'Cannot cast a {coordinate.__class__.__name__} to {cls.__name__}')
         return coordinate
 
     def __init__(self):
         self.shapes = type(self)._ShapeClass(self)
+
+    @abc.abstractmethod
+    def copy(self, deep=False):
+        pass
 
     @property
     def shape(self):
@@ -56,11 +61,15 @@ class NonspatialCoordinate(Coordinate):
         super().__init__(**kwargs)
         self._x = np.asarray(x)
 
-    @classmethod
-    def from_coordinate(cls, coordinate):
-        if type(coordinate) is not cls:
-            raise ValueError(f'Cannot cast a `{coordinate.__class__.__name__}` to {cls.__name__}')
-        return coordinate
+    @property
+    def x(self):
+        return self._x
+
+    def copy(self, deep=False):
+        if deep:
+            return type(self)(x=self.x.copy())
+        else:
+            return type(self)(x=self.x)
 
     class _ShapeClass(Coordinate._ShapeClass):
         @property
@@ -271,7 +280,7 @@ class Cartesian(_CartesianConverter):
 
     @property
     def cartesian_mesh(self):
-        return np.stack(np.meshgrid(self.x, self.y, self.x, indexing='ij', sparse=False), axis=-1).squeeze()
+        return np.stack(np.meshgrid(self.x, self.y, self.z, indexing='ij', sparse=False), axis=-1).squeeze()
 
     class _ShapeClass(_CartesianConverter._ShapeClass):
         @property
@@ -346,11 +355,11 @@ class Spherical(_SphericalConverter):
     def from_coordinate(cls, coordinate):
         return cls(radius=coordinate.radius, colatitude=coordinate.colatitude, azimuth=coordinate.azimuth)
 
-    def __init__(self, radius=1, colatitude=np.pi / 2, azimuth=0, **kwargs):
+    def __init__(self, radius=None, colatitude=None, azimuth=None, **kwargs):
         super().__init__(**kwargs)
-        self._radius = np.asarray(radius)
-        self._colatitude = np.asarray(colatitude)
-        self._azimuth = np.asarray(azimuth)
+        self._radius = np.asarray(radius if radius is not None else 1)
+        self._colatitude = np.asarray(colatitude if colatitude is not None else 0)
+        self._azimuth = np.asarray(azimuth if azimuth is not None else 0)
 
     def copy(self, deep=False):
         if deep:
