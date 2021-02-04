@@ -23,7 +23,7 @@ def axis_angles(request):
 @pytest.fixture(params=[tuple(), (5,), (5, 7)], scope='module')
 def old_positions(request):
     size = request.param
-    return np.random.normal(size=(3,) + size)
+    return np.random.normal(size=size + (3,))
 
 
 # ===================== Actual tests ============================
@@ -32,9 +32,9 @@ def test_value_equality(old_values, new_values):
 
 
 def test_inverse_rotations(old_coefficients, new_coefficients, inverse_rotation_coefficients, rotation_coefficients):
-    recalc_old_indirect = inverse_rotation_coefficients.apply(new_coefficients, inverse=True)
+    recalc_old_indirect = inverse_rotation_coefficients.apply(new_coefficients)
     np.testing.assert_allclose(recalc_old_indirect._data, old_coefficients._data)
-    recalc_old_direct = rotation_coefficients.apply(new_coefficients)
+    recalc_old_direct = rotation_coefficients.apply(new_coefficients, inverse=True)
     np.testing.assert_allclose(recalc_old_direct._data, old_coefficients._data)
 
 
@@ -54,18 +54,20 @@ def test_inverse_rotation_coefficients(inverse_rotation_coefficients, axis_angle
 @pytest.fixture(scope="module")
 def new_z(axis_angles):
     beta, alpha, gamma = axis_angles
-    return shetar.coordinates.spherical_2_cartesian(1, beta, alpha)
+    coord = shetar.coordinates.SpatialCoordinate.parse_args(colatitude=beta, azimuth=alpha)
+    return coord.xyz
 
 
 @pytest.fixture(scope="module")
 def old_z(axis_angles):
     beta, alpha, gamma = axis_angles
-    return shetar.coordinates.spherical_2_cartesian(1, beta, gamma)
+    coord = shetar.coordinates.SpatialCoordinate.parse_args(colatitude=beta, azimuth=gamma)
+    return coord.xyz
 
 
 @pytest.fixture(scope='module')
 def new_positions(new_z, old_z, old_positions):
-    return np.einsum('ij, j...-> i...', shetar.coordinates.z_axes_rotation_matrix(new_axis=new_z, old_axis=old_z), old_positions)
+    return shetar.coordinates.Rotation.parse_args(new_z_axis=new_z, old_z_axis=old_z).apply(position=old_positions).cartesian_mesh
 
 
 # ===================== Expansion coefficients  =====================
@@ -88,19 +90,17 @@ def inverse_rotation_coefficients(order, new_z, old_z):
 
 @pytest.fixture(scope='module')
 def new_coefficients(old_coefficients, rotation_coefficients):
-    return rotation_coefficients.apply(old_coefficients, inverse=True)
+    return rotation_coefficients.apply(old_coefficients)
 
 
 @pytest.fixture(scope='module')
 def old_bases(order, old_positions):
-    _, colatitude, azimuth = shetar.coordinates.cartesian_2_spherical(old_positions)
-    return shetar.bases.SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
+    return shetar.bases.SphericalHarmonics(order=order, position=old_positions)
 
 
 @pytest.fixture(scope='module')
 def new_bases(order, new_positions):
-    _, colatitude, azimuth = shetar.coordinates.cartesian_2_spherical(new_positions)
-    return shetar.bases.SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
+    return shetar.bases.SphericalHarmonics(order=order, position=new_positions)
 
 
 @pytest.fixture(scope='module')

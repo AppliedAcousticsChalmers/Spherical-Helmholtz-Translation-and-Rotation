@@ -116,7 +116,7 @@ def test_SphericalHarmonics(input_order, colatitude_azimuth):
     colatitude, azimuth = colatitude_azimuth
     obj = shetar.bases.SphericalHarmonics(order=input_order, colatitude=colatitude, azimuth=azimuth)
     assert_shape_match(obj._legendre, colatitude)
-    assert_shape_match(obj._azimuth, azimuth)
+    assert_shape_match(obj._phase, azimuth)
     assert_shape_match(obj, np.broadcast(colatitude, azimuth))
 
 
@@ -127,7 +127,7 @@ def test_RegularBase(input_order, wavenumber, radius_colatitude_azimuth):
     assert_shape_match(obj._radial, radius)
     assert_shape_match(obj._angular, np.broadcast(colatitude, azimuth))
     assert_shape_match(obj._angular._legendre, colatitude)
-    assert_shape_match(obj._angular._azimuth, azimuth)
+    assert_shape_match(obj._angular._phase, azimuth)
 
 
 def test_SingularBase(input_order, wavenumber, radius_colatitude_azimuth):
@@ -137,7 +137,7 @@ def test_SingularBase(input_order, wavenumber, radius_colatitude_azimuth):
     assert_shape_match(obj._radial, radius)
     assert_shape_match(obj._angular, np.broadcast(colatitude, azimuth))
     assert_shape_match(obj._angular._legendre, colatitude)
-    assert_shape_match(obj._angular._azimuth, azimuth)
+    assert_shape_match(obj._angular._phase, azimuth)
 
 
 def test_DualBase(input_order, wavenumber, radius_colatitude_azimuth):
@@ -147,7 +147,7 @@ def test_DualBase(input_order, wavenumber, radius_colatitude_azimuth):
     assert_shape_match(obj._radial, radius)
     assert_shape_match(obj._angular, np.broadcast(colatitude, azimuth))
     assert_shape_match(obj._angular._legendre, colatitude)
-    assert_shape_match(obj._angular._azimuth, azimuth)
+    assert_shape_match(obj._angular._phase, azimuth)
 
 
 # =============================== Test rotations ===============================
@@ -165,17 +165,17 @@ def test_Rotation(input_order, colatitude_azimuth):
 
 # ============================= Test translations ==============================
 def test_InteriorCoaxialTranslation(input_order, output_order, radius, wavenumber):
-    obj = shetar.translations.InteriorCoaxialTranslation(input_order=input_order, output_order=output_order, distance=radius, wavenumber=wavenumber)
+    obj = shetar.translations.InteriorCoaxialTranslation(input_order=input_order, output_order=output_order, radius=radius, wavenumber=wavenumber)
     assert_shape_match(obj, radius)
 
 
 def test_ExteriorCoaxialTranslation(input_order, output_order, radius, wavenumber):
-    obj = shetar.translations.ExteriorCoaxialTranslation(input_order=input_order, output_order=output_order, distance=radius, wavenumber=wavenumber)
+    obj = shetar.translations.ExteriorCoaxialTranslation(input_order=input_order, output_order=output_order, radius=radius, wavenumber=wavenumber)
     assert_shape_match(obj, radius)
 
 
 def test_ExteriorInteriorCoaxialTranslation(input_order, output_order, radius, wavenumber):
-    obj = shetar.translations.ExteriorInteriorCoaxialTranslation(input_order=input_order, output_order=output_order, distance=radius, wavenumber=wavenumber)
+    obj = shetar.translations.ExteriorInteriorCoaxialTranslation(input_order=input_order, output_order=output_order, radius=radius, wavenumber=wavenumber)
     assert_shape_match(obj, radius)
 
 
@@ -183,7 +183,6 @@ def test_InteriorTranslation(input_order, output_order, radius_colatitude_azimut
     radius, colatitude, azimuth = radius_colatitude_azimuth
     obj = shetar.translations.InteriorTranslation(input_order=input_order, output_order=output_order, wavenumber=wavenumber, radius=radius, colatitude=colatitude, azimuth=azimuth)
     assert_shape_match(obj, np.broadcast(radius, colatitude, azimuth))
-    assert_shape_match(obj._coaxial, radius)
     assert_shape_match(obj._rotation, np.broadcast(colatitude, azimuth))
 
 
@@ -191,7 +190,6 @@ def test_ExteriorTranslation(input_order, output_order, radius_colatitude_azimut
     radius, colatitude, azimuth = radius_colatitude_azimuth
     obj = shetar.translations.ExteriorTranslation(input_order=input_order, output_order=output_order, wavenumber=wavenumber, radius=radius, colatitude=colatitude, azimuth=azimuth)
     assert_shape_match(obj, np.broadcast(radius, colatitude, azimuth))
-    assert_shape_match(obj._coaxial, radius)
     assert_shape_match(obj._rotation, np.broadcast(colatitude, azimuth))
 
 
@@ -199,5 +197,4 @@ def test_ExteriorInteriorTranslation(input_order, output_order, radius_colatitud
     radius, colatitude, azimuth = radius_colatitude_azimuth
     obj = shetar.translations.ExteriorInteriorTranslation(input_order=input_order, output_order=output_order, wavenumber=wavenumber, radius=radius, colatitude=colatitude, azimuth=azimuth)
     assert_shape_match(obj, np.broadcast(radius, colatitude, azimuth))
-    assert_shape_match(obj._coaxial, radius)
     assert_shape_match(obj._rotation, np.broadcast(colatitude, azimuth))
