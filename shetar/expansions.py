@@ -1,5 +1,5 @@
 import numpy as np
-from . import coordinates, _shape_utilities
+from . import coordinates
 
 
 class Expansion:

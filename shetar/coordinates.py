@@ -207,6 +207,10 @@ class SpatialCoordinate(Coordinate):
         def spherical_mesh(self):
             return self.broadcast_shapes(self.radius, self.colatitude, self.azimuth)
 
+        @property
+        def angular(self):
+            return self.broadcast_shapes(self.colatitude, self.azimuth)
+
 
 class _CartesianConverter(SpatialCoordinate):
     @property
