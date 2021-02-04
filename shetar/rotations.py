@@ -188,33 +188,35 @@ class ColatitudeRotation(coordinates.OwnerMixin):
 
 
 class Rotation(ColatitudeRotation):
-    # Subclass of ColatitudeRptation to get access to the `apply` method, which work the same for both types of rotation.
-    def __init__(self, order, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None):
-        if new_z_axis is not None or old_z_axis is not None:
-            colatitude, azimuth, secondary_azimuth = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
-        # Default values for the phases. This has to be set here since the evaluate function only sets new values if new angles are given.
-        self._primary_phase = np.array(1 + 0j)
-        self._secondary_phase = np.array(1 + 0j)
-        # CoalatitudeRotation will pass the azimuth angles through to evaluate.
-        super().__init__(order=order, colatitude=colatitude, azimuth=azimuth, secondary_azimuth=secondary_azimuth)
+    # Subclass of ColatitudeRotation to get access to the `apply` method, which work the same for both types of rotation.
+    def __init__(self, order, position=None, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None, defer_evaluation=False):
+        coordinate = coordinates.Rotation.parse_args(
+            position=position, new_z_axis=new_z_axis, old_z_axis=old_z_axis,
+            colatitude=colatitude, azimuth=azimuth, secondary_azimuth=secondary_azimuth)
+        super().__init__(order=order, position=coordinate, defer_evaluation=defer_evaluation)
 
-    def evaluate(self, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None, **kwargs):
-        if new_z_axis is not None or old_z_axis is not None:
-            colatitude, azimuth, secondary_azimuth = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
-        if colatitude is not None:
-            # Allows changing the azimuth angles without changing the colatitude.
-            # Useful since changing the azimuth angles is cheap, whilg chanigng
-            # the colatitude is expensive.
-            super().evaluate(colatitude=colatitude, **kwargs)
-        if azimuth is not None:
-            self._primary_phase = np.asarray(np.exp(1j * azimuth))
-        if secondary_azimuth is not None:
-            self._secondary_phase = np.asarray(np.exp(1j * secondary_azimuth))
+    def evaluate(self, position=None, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None):
+        if (position is None) and (new_z_axis is None) and (old_z_axis is None) and (colatitude is None):
+            # Allows chaing the azimuth angles without reevaluating the colatitude rotation.
+            # This might be useful sometimes since changing the azimuth angles is much cheaper than
+            # changing the colatitude angle. If we anyhow change the colatitude roration, reevaluating the
+            # azimuth rotations will be very cheap so we won't bother with checking if we could skip it.
+            if azimuth is not None:
+                self._primary_phase = np.asarray(np.exp(1j * azimuth))
+            if secondary_azimuth is not None:
+                self._secondary_phase = np.asarray(np.exp(1j * secondary_azimuth))
+        else:
+            self.coordinate = coordinates.Rotation.parse_args(
+                position=position, new_z_axis=new_z_axis, old_z_axis=old_z_axis,
+                colatitude=colatitude, azimuth=azimuth, secondary_azimuth=secondary_azimuth)
+            super().evaluate(position=self.coordinate)
+            self._primary_phase = np.asarray(np.exp(1j * self.coordinate.azimuth))
+            self._secondary_phase = np.asarray(np.exp(1j * self.coordinate.secondary_azimuth))
         return self
 
     @property
     def shape(self):
-        return _shape_utilities.broadcast_shapes(self._colatitude_shape, self._primary_phase.shape, self._secondary_phase.shape, output='new')
+        return self.coordinate.shape
 
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)
