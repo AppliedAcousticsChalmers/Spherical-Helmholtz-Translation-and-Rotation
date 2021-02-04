@@ -31,6 +31,9 @@ class Coordinate(abc.ABC):
     def ndim(self):
         return self.shapes.ndim
 
+    def apply(self, transform, *args, **kwargs):
+        return transform.apply(self, *args, **kwargs)
+
     class _ShapeClass(abc.ABC):
         @staticmethod
         def broadcast_shapes(*shapes, output='new'):
@@ -143,6 +146,12 @@ class SpatialCoordinate(Coordinate):
     @property
     def radius_colatitude_azimuth(self):
         return self.radius, self.colatitude, self.azimuth
+
+    def rotate(self, *args, **kwargs):
+        return Rotation.parse_args(*args, **kwargs).apply(self)
+
+    def translate(self, *args, **kwargs):
+        return Translation.parse_args(*args, **kwargs).apply(self)
 
     class _ShapeClass(Coordinate._ShapeClass):
         @property
@@ -580,3 +589,160 @@ def z_axes_rotation_angles(new_axis=None, old_axis=None):
 def z_axes_rotation_matrix(new_axis=None, old_axis=None):
     beta, alpha, mu = z_axes_rotation_angles(new_axis=new_axis, old_axis=old_axis)
     return rotation_matrix(beta, alpha, mu)
+class Rotation(Coordinate):
+    @staticmethod
+    def z_axes_rotation_angles(new_axis=None, old_axis=None):
+        if new_axis is None and old_axis is None:
+            raise ValueError('Must define at least the new z-axis or the old z-axis')
+
+        if new_axis is None:
+            _, colatitude, azimuth_old = CartesianMesh(old_axis).radius_colatitude_azimuth
+            azimuth_new = 0
+        elif old_axis is None:
+            _, colatitude, azimuth_new = CartesianMesh(new_axis).radius_colatitude_azimuth
+            azimuth_old = np.pi
+        else:
+            _, colatitude, azimuth_new = CartesianMesh(new_axis).radius_colatitude_azimuth
+            _, colatitude_old, azimuth_old = CartesianMesh(old_axis).radius_colatitude_azimuth
+            if not np.allclose(colatitude, colatitude_old):
+                raise ValueError('New z-axis and old z-axis does not have the same angle between them, check the inputs!')
+        return colatitude, azimuth_new, np.pi - azimuth_old
+
+    @classmethod
+    def parse_args(cls, position=None, *, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None):
+        obj = super().parse_args(position)
+        if obj is not None:
+            return obj
+        if new_z_axis is not None or old_z_axis is not None:
+            colatitude, azimuth, secondary_azimuth = cls.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
+        return Rotation(colatitude=colatitude, azimuth=azimuth, secondary_azimuth=secondary_azimuth)
+
+    def __init__(self, colatitude=None, azimuth=None, secondary_azimuth=None, automesh=False, **kwargs):
+        super().__init__(**kwargs)
+        self.automesh = automesh
+        self._colatitude = np.asarray(colatitude if colatitude is not None else 0)
+        self._azimuth = np.asarray(azimuth if azimuth is not None else 0)
+        self._secondary_azimuth = np.asarray(secondary_azimuth if secondary_azimuth is not None else 0)
+
+    @property
+    def colatitude(self):
+        return np.reshape(self._colatitude, self.shapes.colatitude)
+
+    @property
+    def azimuth(self):
+        return np.reshape(self._azimuth, self.shapes.azimuth)
+
+    @property
+    def secondary_azimuth(self):
+        return np.reshape(self._secondary_azimuth, self.shapes.secondary_azimuth)
+
+    def copy(self, deep=False):
+        if deep:
+            return type(self)(colatitude=self._colatitude.copy(), azimuth=self._azimuth.copy(), secondary_azimuth=self._secondary_azimuth.copy(), automesh=self.automesh)
+        else:
+            return type(self)(colatitude=self._colatitude, azimuth=self._azimuth, secondary_azimuth=self._secondary_azimuth, automesh=self.automesh)
+
+    @property
+    def rotation_matrix(self):
+        import scipy.spatial.transform
+        return scipy.spatial.transform.Rotation.from_euler('zyz', [self.secondary_azimuth, self.colatitude, self.azimuth]).as_matrix()
+
+    def apply(self, position=None, inverse=False, **kwargs):
+        coordinate = SpatialCoordinate.parse_args(position=position, **kwargs)
+        # As a result of that the mesh is of shape (..., 3), we have to do the matrix multiplication
+        # from the right. The "normal" way is to do it from the left. This means that we have to
+        # transpose the matrix to apply it in the forward way. Since a rotation matix is orthogonal, the
+        # inverse rotation is described by the tranpose of the rotation matrix, which in this case ends up
+        # as the rotation matrix, since we apply it from the right.
+        if inverse:
+            R = self.rotation_matrix
+        else:
+            R = self.rotation_matrix.T
+        return CartesianMesh(coordinate.cartesian_mesh @ R)
+
+    class _ShapeClass(Coordinate._ShapeClass):
+        @property
+        def colatitude(self):
+            if self.owner.automesh:
+                return np.shape(self.owner._colatitude) + (1,) * (np.ndim(self.owner._azimuth) + np.ndim(self.owner._secondary_azimuth))
+            else:
+                return np.shape(self.owner._colatitude)
+
+        @property
+        def azimuth(self):
+            if self.owner.automesh:
+                return (1,) * np.ndim(self.owner._colatitude) + np.shape(self.owner._azimuth) + (1,) * np.ndim(self.owner._secondary_azimuth)
+            else:
+                return np.shape(self.owner._azimuth)
+
+        @property
+        def secondary_azimuth(self):
+            if self.owner.automesh:
+                return (1,) * (np.ndim(self.owner._colatitude) + np.ndim(self.owner._azimuth)) + np.shape(self.owner._secondary_azimuth)
+            else:
+                return np.shape(self.owner._secondary_azimuth)
+
+        @property
+        def shape(self):
+            return self.broadcast_shapes(self.colatitude, self.azimuth, self.secondary_azimuth)
+
+
+class Translation(Coordinate):
+    @classmethod
+    def parse_args(cls, position=None, *, automesh=False,
+                   x=None, y=None, z=None, cartesian_mesh=None,
+                   radius=None, colatitude=None, azimuth=None, spherical_mesh=None):
+        obj = super().parse_args(position)
+        if obj is not None:
+            return obj
+        coordinate = SpatialCoordinate.parse_args(
+            position=position, automesh=automesh,
+            x=x, y=y, z=z, cartesian_mesh=cartesian_mesh,
+            radius=radius, colatitude=colatitude, azimuth=azimuth, spherical_mesh=spherical_mesh)
+        return cls(coordinate=coordinate)
+
+    def __init__(self, coordinate):
+        super().__init__()
+        self.coordinate = coordinate
+
+    def copy(self, deep=False):
+        return type(self)(coordinate=self.coordinate.copy(deep=deep))
+
+    def apply(self, position=None, inverse=False, **kwargs):
+        coordinate = SpatialCoordinate.parse_args(position=position, **kwargs)
+        if inverse:
+            return Cartesian(x=coordinate.x - self.x, y=coordinate.y - self.y, z=coordinate.z - self.z)
+        else:
+            return Cartesian(x=coordinate.x + self.x, y=coordinate.y + self.y, z=coordinate.z + self.z)
+
+    def _coordinate_property(key):
+        def wrapped(self):
+            return getattr(self.coordinate, key)
+        return property(wrapped)
+
+    x = _coordinate_property('x')
+    y = _coordinate_property('y')
+    z = _coordinate_property('z')
+    radius = _coordinate_property('radius')
+    colatitude = _coordinate_property('colatitude')
+    azimuth = _coordinate_property('azimuth')
+    cartesian_mesh = _coordinate_property('cartesian_mesh')
+    spherical_mesh = _coordinate_property('spherical_mesh')
+    xyz = _coordinate_property('xyz')
+    radius_colatitude_azimuth = _coordinate_property('radius_colatitude_azimuth')
+
+    class _ShapeClass(Coordinate._ShapeClass):
+        def _coordinate_shape(key):
+            def wrapped(self):
+                return getattr(self.owner.coordinate.shapes, key)
+            return property(wrapped)
+
+        x = _coordinate_shape('x')
+        y = _coordinate_shape('y')
+        z = _coordinate_shape('z')
+        radius = _coordinate_shape('radius')
+        colatitude = _coordinate_shape('colatitude')
+        azimuth = _coordinate_shape('azimuth')
+        cartesian_mesh = _coordinate_shape('cartesian_mesh')
+        spherical_mesh = _coordinate_shape('spherical_mesh')
+        shape = _coordinate_shape('shape')
