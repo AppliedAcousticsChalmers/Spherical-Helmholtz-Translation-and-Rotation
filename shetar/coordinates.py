@@ -4,6 +4,21 @@ import numpy as np
 import abc
 
 
+class OwnerMixin:
+    @property
+    def shape(self):
+        return self.coordinate.shape
+
+    @property
+    def ndim(self):
+        return len(self.shape)
+
+    def copy(self, deep=False):
+        new_obj = type(self).__new__(type(self))
+        new_obj.coordinate = self.coordinate.copy(deep=deep)
+        return new_obj
+
+
 class Coordinate(abc.ABC):
     @classmethod
     def parse_args(cls, coordinate):
