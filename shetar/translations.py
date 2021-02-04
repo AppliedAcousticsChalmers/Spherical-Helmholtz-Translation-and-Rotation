@@ -263,58 +263,38 @@ class ExteriorInteriorCoaxialTranslation(CoaxialTranslation):
     _default_output_type = expansions.InteriorExpansion
 
 
-class Translation:
+class Translation(CoaxialTranslation):
     def __init__(self, input_order, output_order, position=None, wavenumber=None,
-                 radius=None, colatitude=None, azimuth=None):
-
-        if position is not None:
-            radial_shape = np.broadcast(position[0])
-            colatitude_shape = np.broadcast(position[0])
-            azimuth_shape = np.broadcast(position[0])
-        else:
-            radial_shape = np.broadcast(radius)
-            colatitude_shape = np.broadcast(colatitude)
-            azimuth_shape = np.broadcast(azimuth)
-
-        self._coaxial = self._coaxial_cls(
-            input_order=input_order, output_order=output_order,
-            distance=radial_shape, wavenumber=wavenumber
-        )
+                 radius=None, colatitude=None, azimuth=None, defer_evaluation=False):
+        coordinate = coordinates.Translation.parse_args(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth)
         self._rotation = rotations.Rotation(
-            order=max(input_order, output_order),
-            colatitude=colatitude_shape, azimuth=azimuth_shape
+            order=max(input_order, output_order), defer_evaluation=True,
+            colatitude=coordinate.colatitude, azimuth=coordinate.azimuth,
         )
-
-        if _shape_utilities.is_value(position):
-            self.evaluate(position=position, wavenumber=wavenumber)
-        elif _shape_utilities.is_value(radius) and _shape_utilities.is_value(colatitude) and _shape_utilities.is_value(azimuth):
-            self.evaluate(radius=radius, colatitude=colatitude, azimuth=azimuth, wavenumber=wavenumber)
+        super().__init__(input_order=input_order, output_order=output_order, position=coordinate, wavenumber=wavenumber, defer_evaluation=defer_evaluation)
 
     def evaluate(self, position=None, wavenumber=None, radius=None, colatitude=None, azimuth=None):
-        if position is not None:
-            radius, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
-        if radius is not None:
-            self._coaxial.evaluate(distance=radius, wavenumber=wavenumber)
-        self._rotation.evaluate(colatitude=colatitude, azimuth=azimuth)
+        self.coordinate = coordinates.Translation.parse_args(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth)
+        if (position is not None) or (radius is not None) or (wavenumber is not None):
+            super().evaluate(position=self.coordinate, wavenumber=wavenumber)
+        if (position is not None) or (colatitude is not None) or (azimuth is not None):
+            self._rotation.evaluate(colatitude=self.coordinate.colatitude, azimuth=self.coordinate.azimuth)
         return self
 
-    def apply(self, expansion, inverse=False):
+    def apply(self, expansion, inverse=False, _only_coaxial=False):
+        if _only_coaxial:
+            return super().apply(expansion, inverse=inverse)
         if not inverse:
-            return expansion.apply(self._rotation, inverse=True).apply(self._coaxial).apply(self._rotation)
+            return expansion.apply(self._rotation, inverse=True).apply(self, _only_coaxial=True).apply(self._rotation)
         else:
             raise NotImplementedError('Inverse translations not implemented yet.')
 
     @property
     def shape(self):
-        return _shape_utilities.broadcast_shapes(self._coaxial.shape, self._rotation.shape, output='new')
-
-    @property
-    def ndim(self):
-        return max(self._coaxial.ndim, self._rotation.ndim)
+        return self.coordinate.shape
 
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
-        new_obj._coaxial = self._coaxial.copy(deep=deep)
+        new_obj = super().copy(deep=deep)
         new_obj._rotation = self._rotation.copy(deep=deep)
         return new_obj
 
@@ -326,13 +306,13 @@ class Translation:
         return new_obj
 
 
-class InteriorTranslation(Translation):
-    _coaxial_cls = InteriorCoaxialTranslation
+class InteriorTranslation(Translation, InteriorCoaxialTranslation):
+    pass
 
 
-class ExteriorTranslation(Translation):
-    _coaxial_cls = ExteriorCoaxialTranslation
+class ExteriorTranslation(Translation, ExteriorCoaxialTranslation):
+    pass
 
 
-class ExteriorInteriorTranslation(Translation):
-    _coaxial_cls = ExteriorInteriorCoaxialTranslation
+class ExteriorInteriorTranslation(Translation, ExteriorInteriorCoaxialTranslation):
+    pass
