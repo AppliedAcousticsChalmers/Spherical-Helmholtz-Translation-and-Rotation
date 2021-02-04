@@ -218,8 +218,8 @@ class CoaxialTranslation(coordinates.OwnerMixin):
         if out is None:
             self_shape = self.shape
             expansion_shape = np.shape(expansion)
-            output_shape = np.broadcast(np.empty(self_shape, dtype=[]), np.empty(expansion_shape, dtype=[]))
-            out = self._default_output_type(order=self.input_order if inverse else self.output_order, wavenumber=self.wavenumber, data=output_shape)
+            output_shape = np.broadcast(np.empty(self_shape, dtype=[]), np.empty(expansion_shape, dtype=[])).shape
+            out = self._default_output_type(order=self.input_order if inverse else self.output_order, wavenumber=self.wavenumber, shape=output_shape)
         elif expansion is out:
             raise NotImplementedError('Translations cannot currently be applied in place')
         if not inverse:

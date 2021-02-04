@@ -146,11 +146,11 @@ class ColatitudeRotation(coordinates.OwnerMixin):
             wavenumber = getattr(expansion, 'wavenumber', None)
             self_shape = self.shape
             expansion_shape = np.shape(expansion)
-            output_shape = np.broadcast(np.empty(self_shape, dtype=[]), np.empty(expansion_shape, dtype=[]))
+            output_shape = np.broadcast(np.empty(self_shape, dtype=[]), np.empty(expansion_shape, dtype=[])).shape
             if isinstance(expansion, expansions.Expansion):
-                out = type(expansion)(order=N, data=output_shape, wavenumber=wavenumber)
+                out = type(expansion)(order=N, shape=output_shape, wavenumber=wavenumber)
             else:
-                out = expansions.Expansion(order=N, data=output_shape, wavenumber=wavenumber)
+                out = expansions.Expansion(order=N, shape=output_shape, wavenumber=wavenumber)
         elif expansion is out:
             raise NotImplementedError('Rotations cannot currently be applied in place')
         if inverse:

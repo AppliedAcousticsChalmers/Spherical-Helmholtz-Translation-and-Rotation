@@ -3,19 +3,20 @@ from . import coordinates, _shape_utilities
 
 
 class Expansion:
-    def __init__(self, order=None, data=None, wavenumber=None):
+    def __init__(self, order=None, data=None, wavenumber=None, shape=None):
         self._wavenumber = wavenumber
-        if _shape_utilities.is_value(data):
+        if data is not None:
             self._data = data
             if order is not None and self.order != order:
                 raise ValueError(f'Received data of order {self.order} in conflict with specified order {order}')
             if np.shape(wavenumber) != np.shape(data)[1:(np.ndim(wavenumber) + 1)]:
                 raise ValueError(f'Received wavenumber of shape {np.shape(wavenumber)} in conflict with data of shape {np.shape(data)}')
-        elif type(data) == np.broadcast and order is None:
-            self._data = np.zeros(np.shape(data), dtype=complex)
+            if shape is not None and np.shape(data)[2:] != shape:
+                raise ValueError(f'Received explicit shape {shape} in conflict with data of shape {np.shape(data)}')
         elif order is not None:
+            shape = tuple() if shape is None else (shape,) if type(shape) is int else tuple(shape)
             num_unique = (order + 1) ** 2
-            self._data = np.zeros((num_unique,) + np.shape(wavenumber) + np.shape(data), dtype=complex)
+            self._data = np.zeros((num_unique,) + np.shape(wavenumber) + shape, dtype=complex)
         else:
             raise ValueError('Cannot initialize expansion without either raw data or known order')
 
