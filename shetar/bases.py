@@ -4,13 +4,17 @@ from . import coordinates
 from . import _shape_utilities
 
 
-class LegendrePolynomials:
-    def __init__(self, order, x=None, normalization='orthonormal'):
+class LegendrePolynomials(coordinates.OwnerMixin):
+    def __init__(self, order, position=None, colatitude=None, x=None, normalization='orthonormal', defer_evaluation=False):
+        if x is not None:
+            self.coordinate = coordinates.NonspatialCoordinate(x=x)
+        else:
+            self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
         self.normalization = normalization
-        self._data = np.zeros((order + 1,) + np.shape(x), dtype=float)
+        self._data = np.zeros((order + 1,) + self.shape, dtype=float)
 
-        if _shape_utilities.is_value(x):
-            self.evaluate(x)
+        if not defer_evaluation:
+            self.evaluate(self.coordinate)
 
     @property
     def order(self):
@@ -18,14 +22,12 @@ class LegendrePolynomials:
 
     @property
     def shape(self):
-        return self._data.shape[1:]
-
-    @property
-    def ndim(self):
-        return len(self.shape)
+        if isinstance(self.coordinate, coordinates.NonspatialCoordinate):
+            return self.coordinate.shape
+        return self.coordinate.shapes.colatitude
 
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
+        new_obj = super().copy(deep=deep)
         new_obj.normalization = self.normalization
         new_obj._order = self.order
         if deep:
@@ -48,8 +50,19 @@ class LegendrePolynomials:
             new_obj._x = np.reshape(new_obj._x, newshape)
         return new_obj
 
-    def evaluate(self, x):
-        self._x = x = np.asarray(x)
+    @property
+    def _x(self):
+        if isinstance(self.coordinate, coordinates.NonspatialCoordinate):
+            return self.coordinate.x
+        if isinstance(self.coordinate, coordinates.SpatialCoordinate):
+            return np.cos(self.coordinate.colatitude)
+
+    def evaluate(self, position=None, colatitude=None, x=None):
+        if x is not None:
+            self.coordinate = coordinates.NonspatialCoordinate(x=x)
+        else:
+            self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
+        x = self._x
         self._data[0] = 1 / 2**0.5
         if self.order > 0:
             self._data[1] = x * 1.5**0.5
@@ -93,20 +106,28 @@ class LegendrePolynomials:
 
 
 class AssociatedLegendrePolynomials(LegendrePolynomials):
-    def __init__(self, order, x=None, normalization='orthonormal'):
+    def __init__(self, order, position=None, colatitude=None, x=None, normalization='orthonormal', defer_evaluation=False):
+        if x is not None:
+            self.coordinate = coordinates.NonspatialCoordinate(x=x)
+        else:
+            self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
         self.normalization = normalization
         num_unique = (order + 1) * (order + 2) // 2
-        self._data = np.zeros((num_unique,) + np.shape(x), dtype=float)
+        self._data = np.zeros((num_unique,) + self.shape, dtype=float)
 
-        if _shape_utilities.is_value(x):
-            self.evaluate(x)
+        if not defer_evaluation:
+            self.evaluate(self.coordinate)
 
     @property
     def order(self):
         return int((8 * self._data.shape[0] + 1)**0.5 - 3) // 2
 
-    def evaluate(self, x):
-        self._x = x = np.asarray(x)
+    def evaluate(self, position=None, colatitude=None, x=None):
+        if x is not None:
+            self.coordinate = coordinates.NonspatialCoordinate(x=x)
+        else:
+            self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
+        x = self._x
         one_minus_x_square = 1 - x**2
 
         # Access the data directly to bypass the normalization code in the getter.
