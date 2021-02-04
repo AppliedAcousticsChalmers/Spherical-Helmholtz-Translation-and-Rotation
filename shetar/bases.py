@@ -257,26 +257,21 @@ class DualRadialBase(_RadialBaseClass):
         return np.stack([bessel, bessel + 1j * neumann], axis=1)
 
 
-class SphericalHarmonics:
-    def __init__(self, order, position=None, colatitude=None, azimuth=None, *args, **kwargs):
-        if position is not None:
-            colatitude_shape = azimuth_shape = np.broadcast(position[0])
+class SphericalHarmonics(coordinates.OwnerMixin):
+    def __init__(self, order, position=None, colatitude=None, azimuth=None, defer_evaluation=False, *args, **kwargs):
+        self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude, azimuth=azimuth)
+        self._legendre = AssociatedLegendrePolynomials(order, position=self.coordinate, normalization='orthonormal', defer_evaluation=defer_evaluation)
+        if not defer_evaluation:
+            self.evaluate(self.coordinate)
         else:
-            colatitude_shape = np.broadcast(colatitude)
-            azimuth_shape = np.broadcast(azimuth)
-        self._legendre = AssociatedLegendrePolynomials(order, x=colatitude_shape, normalization='orthonormal')
-        self._azimuth = azimuth_shape
-        if _shape_utilities.is_value(position):
-            self.evaluate(position=position)
-        elif _shape_utilities.is_value(azimuth) and _shape_utilities.is_value(colatitude):
-            self.evaluate(colatitude=colatitude, azimuth=azimuth)
+            self._phase = np.ones(self.shape, complex)
 
     def evaluate(self, position=None, colatitude=None, azimuth=None):
-        if position is not None:
-            _, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
-        cosine_colatitude = np.cos(colatitude)
-        self._legendre.evaluate(cosine_colatitude)
-        self._azimuth = np.asarray(azimuth if np.iscomplexobj(azimuth) else np.exp(1j * azimuth))
+        self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude, azimuth=azimuth)
+        if (position is not None) or (colatitude is not None):
+            self._legendre.evaluate(position=self.coordinate)
+        if (position is not None) or (azimuth is not None):
+            self._phase = np.asarray(np.exp(1j * self.coordinate.azimuth))
         return self
 
     def apply(self, expansion):
@@ -288,7 +283,7 @@ class SphericalHarmonics:
 
     def __getitem__(self, key):
         order, mode = key
-        return self._legendre[order, mode] * self._azimuth ** mode / (2 * np.pi)**0.5
+        return self._legendre[order, mode] * self._phase ** mode / (2 * np.pi)**0.5
 
     @property
     def order(self):
@@ -296,19 +291,15 @@ class SphericalHarmonics:
 
     @property
     def shape(self):
-        return _shape_utilities.broadcast_shapes(self._legendre.shape, self._azimuth.shape, output='new')
-
-    @property
-    def ndim(self):
-        return len(self.shape)
+        return self.coordinate.shapes.broadcast_shapes(self.coordinate.shapes.colatitude, self.coordinate.shapes.azimuth)
 
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
+        new_obj = super().copy(deep=deep)
         new_obj._legendre = self._legendre.copy(deep=deep)
         if deep:
-            new_obj._azimuth = self._azimuth.copy()
+            new_obj._phase = self._phase.copy()
         else:
-            new_obj._azimuth = self._azimuth
+            new_obj._phase = self._phase
         return new_obj
 
     def reshape(self, newshape, *args, **kwargs):
