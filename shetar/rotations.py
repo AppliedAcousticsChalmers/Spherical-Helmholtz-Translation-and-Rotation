@@ -2,34 +2,25 @@ import numpy as np
 from . import coordinates, bases, expansions, _shape_utilities
 
 
-class ColatitudeRotation:
-    def __init__(self, order, colatitude=None, **kwargs):
+class ColatitudeRotation(coordinates.OwnerMixin):
+    def __init__(self, order, position=None, colatitude=None, defer_evaluation=False):
+        self.coordinate = coordinates.Rotation.parse_args(position=position, colatitude=colatitude)
         self._order = order
         num_unique = (self.order + 1) * (self.order + 2) * (2 * self.order + 3) // 6
-        self._data = np.zeros((num_unique,) + np.shape(colatitude), dtype=float)
-        if _shape_utilities.is_value(colatitude):
-            # kwargs used to pass azimuth angles from `Rotation._init__` to `Rotation.evaluate`
-            self.evaluate(colatitude=colatitude, **kwargs)
+        self._data = np.zeros((num_unique,) + self.coordinate.shapes.colatitude, dtype=float)
+        if not defer_evaluation:
+            self.evaluate(self.coordinate)
 
     @property
     def order(self):
         return self._order
 
     @property
-    def _colatitude_shape(self):
-        return np.shape(self._data)[1:]
-
-    @property
     def shape(self):
-        # Detour so that we can still access the colatitude shape from the Rotation class
-        return self._colatitude_shape
-
-    @property
-    def ndim(self):
-        return len(self.shape)
+        return self.coordinate.shapes.colatitude
 
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
+        new_obj = super().copy(deep=deep)
         new_obj._order = self._order
         if deep:
             new_obj._data = self._data.copy()
@@ -95,8 +86,9 @@ class ColatitudeRotation:
             sign = 1
         return sign * self._data[self._idx(n, p, m)]
 
-    def evaluate(self, colatitude=None):
-        cosine_colatitude = np.cos(colatitude)
+    def evaluate(self, position=None, colatitude=None):
+        self.coordinate = coordinates.Rotation.parse_args(position=position, colatitude=colatitude)
+        cosine_colatitude = np.cos(self.coordinate.colatitude)
         sine_colatitude = (1 - cosine_colatitude**2)**0.5
 
         legendre = bases.AssociatedLegendrePolynomials(order=self.order, x=cosine_colatitude)
