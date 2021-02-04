@@ -187,25 +187,24 @@ class AssociatedLegendrePolynomials(LegendrePolynomials):
         return value
 
 
-class _RadialBaseClass:
-    def __init__(self, order, radius=None, wavenumber=None):
+class _RadialBaseClass(coordinates.OwnerMixin):
+    def __init__(self, order, position=None, radius=None, wavenumber=None, defer_evaluation=False):
+        self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, radius=radius)
         self._order = order
         self._wavenumber = wavenumber
+        if not defer_evaluation:
+            self.evaluate(self.coordinate)
 
-        if _shape_utilities.is_value(radius):
-            self.evaluate(radius, wavenumber)
-        else:
-            self._data = np.broadcast(radius)
-
-    def evaluate(self, radius, wavenumber=None):
+    def evaluate(self, position=None, radius=None, wavenumber=None):
+        self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, radius=radius)
         if wavenumber is not None:
             self._wavenumber = wavenumber
         if self.wavenumber is None:
-            x = radius
+            x = self.coordinate.radius
         else:
-            x = radius * np.reshape(wavenumber, np.shape(wavenumber) + (1,) * np.ndim(radius))
+            x = self.coordinate.radius * np.reshape(self.wavenumber, np.shape(self.wavenumber) + (1,) * self.ndim)
 
-        order = np.arange(self.order + 1).reshape((-1,) + (1,) * (np.ndim(self.wavenumber) + len(np.shape(radius))))
+        order = np.arange(self.order + 1).reshape((-1,) + (1,) * (np.ndim(self.wavenumber) + self.ndim))
         self._data = self._radial_func(order, x)
         return self
 
@@ -215,14 +214,10 @@ class _RadialBaseClass:
 
     @property
     def shape(self):
-        return np.shape(self._data)[1 + np.ndim(self.wavenumber):]
-
-    @property
-    def ndim(self):
-        return len(self.shape)
+        return self.coordinate.shapes.radius
 
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
+        new_obj = super().copy(deep=deep)
         new_obj._order = self.order
         new_obj._wavenumber = self.wavenumber
         if deep:
@@ -260,10 +255,6 @@ class DualRadialBase(_RadialBaseClass):
         bessel = scipy.special.spherical_jn(order, x, derivative=False)
         neumann = scipy.special.spherical_yn(order, x, derivative=False)
         return np.stack([bessel, bessel + 1j * neumann], axis=1)
-
-    @property
-    def shape(self):
-        return np.shape(self._data)[2 + np.ndim(self.wavenumber):]
 
 
 class SphericalHarmonics:
