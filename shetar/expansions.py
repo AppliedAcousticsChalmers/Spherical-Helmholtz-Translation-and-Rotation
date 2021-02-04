@@ -203,10 +203,9 @@ def plane_wave(order, strength=1, colatitude=None, azimuth=None, wavenumber=None
     in the field, and :math:`\vec k` is the wavevector.
     """
     from .bases import SphericalHarmonics
-    if wavevector is not None:
-        wavenumber, colatitude, azimuth = coordinates.cartesian_2_spherical(wavevector)
-    expansion = InteriorExpansion(order=order, data=np.broadcast(colatitude, azimuth), wavenumber=wavenumber)
-    spherical_harmonics = SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
+    wave_coordinate = coordinates.SpatialCoordinate.parse_args(position=wavevector, radius=wavenumber, colatitude=colatitude, azimuth=azimuth)
+    expansion = InteriorExpansion(order=order, shape=wave_coordinate.shapes.angular, wavenumber=wave_coordinate.radius)
+    spherical_harmonics = SphericalHarmonics(order=order, position=wave_coordinate)
     strength = strength * 4 * np.pi
     for n in range(order + 1):
         for m in range(-n, n + 1):
@@ -255,9 +254,9 @@ def circular_ring(
     ring, :math:`r` is the distance from the source, and :math:`\theta` is the
     angle between the position vector and the source normal.
     """
-    if wavevector is not None:
-        wavenumber, colatitude, azimuth = coordinates.cartesian_2_spherical(wavevector)
-    expansion = ExteriorExpansion(order=order, wavenumber=wavenumber, data=np.broadcast(colatitude, azimuth))
+    wave_coordinate = coordinates.SpatialCoordinate.parse_args(position=wavevector, radius=wavenumber, colatitude=colatitude, azimuth=azimuth)
+    wavenumber = wave_coordinate.radius
+    expansion = ExteriorExpansion(order=order, wavenumber=wavenumber, shape=wave_coordinate.shapes.angular)
     strength = strength * wavenumber * 1j / 2
     from scipy.special import spherical_jn, gamma
     even_n = np.arange(0, order + 1, 2)

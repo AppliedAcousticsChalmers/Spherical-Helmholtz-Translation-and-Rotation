@@ -276,7 +276,7 @@ class SphericalHarmonics(coordinates.OwnerMixin):
 
     @property
     def shape(self):
-        return self.coordinate.shapes.broadcast_shapes(self.coordinate.shapes.colatitude, self.coordinate.shapes.azimuth)
+        return self.coordinate.shapes.angular
 
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)
