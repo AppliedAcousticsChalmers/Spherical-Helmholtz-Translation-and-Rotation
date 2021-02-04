@@ -135,15 +135,6 @@ class SpatialCoordinate(Coordinate):
         pass
 
     @property
-    def cartesian_mesh(self):
-        xyz = np.meshgrid(self.x, self.y, self.z, indexing='ij', sparse=False)
-        return np.stack(xyz, axis=-1)
-
-    @property
-    def xyz(self):
-        return self.x, self.y, self.z
-
-    @property
     @abc.abstractmethod
     def radius(self):
         pass
@@ -159,8 +150,21 @@ class SpatialCoordinate(Coordinate):
         pass
 
     @property
+    def xyz(self):
+        return np.broadcast_arrays(self.x, self.y, self.z)
+
+    @property
     def radius_colatitude_azimuth(self):
-        return self.radius, self.colatitude, self.azimuth
+        return np.broadcast_arrays(self.radius, self.colatitude, self.azimuth)
+
+    @property
+    def cartesian_mesh(self):
+        pass
+        return np.stack(self.xyz, axis=-1).squeeze()
+
+    @property
+    def spherical_mesh(self):
+        return np.stack(self.radius_colatitude_azimuth, axis=-1).squeeze()
 
     def rotate(self, *args, **kwargs):
         return Rotation.parse_args(*args, **kwargs).apply(self)
@@ -227,10 +231,6 @@ class _CartesianConverter(SpatialCoordinate):
     def azimuth(self):
         return np.arctan2(self.y, self.x)
 
-    @property
-    def spherical_mesh(self):
-        return np.stack(np.broadcast_arrays(self.radius, self.colatitude, self.azimuth), axis=-1).squeeze()
-
     class _ShapeClass(SpatialCoordinate._ShapeClass):
         @property
         def radius(self):
@@ -257,10 +257,6 @@ class _SphericalConverter(SpatialCoordinate):
     @property
     def z(self):
         return self.radius * np.cos(self.colatitude)
-
-    @property
-    def cartesian_mesh(self):
-        return np.stack(np.broadcast_arrays(self.x, self.y, self.z), axis=-1).squeeze()
 
     class _ShapeClass(SpatialCoordinate._ShapeClass):
         @property
@@ -305,10 +301,6 @@ class Cartesian(_CartesianConverter):
     @property
     def z(self):
         return np.reshape(self._z, self.shapes.z)
-
-    @property
-    def cartesian_mesh(self):
-        return np.stack(np.meshgrid(self.x, self.y, self.z, indexing='ij', sparse=False), axis=-1).squeeze()
 
     class _ShapeClass(_CartesianConverter._ShapeClass):
         @property
@@ -407,10 +399,6 @@ class Spherical(_SphericalConverter):
     def azimuth(self):
         return np.reshape(self._azimuth, self.shapes.azimuth)
 
-    @property
-    def spherical_mesh(self):
-        return np.stack(np.meshgrid(self.radius, self.colatitude, self.azimuth, indexing='ij', sparse=False), axis=-1).squeeze()
-
     class _ShapeClass(_SphericalConverter._ShapeClass):
         @property
         def radius(self):
@@ -467,8 +455,8 @@ class SphericalMesh(_SphericalConverter):
         return self._spherical_mesh[..., 2]
 
     @property
-    def spherial_mesh(self):
-        return self._spherial_mesh
+    def spherical_mesh(self):
+        return self._spherical_mesh
 
     @property
     def shape(self):
