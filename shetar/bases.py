@@ -310,52 +310,28 @@ class SphericalHarmonics(coordinates.OwnerMixin):
         return new_obj
 
 
-class SphericalBase:
+class SphericalBase(coordinates.OwnerMixin):
     def __init__(self, order, position=None, wavenumber=None,
-                 radius=None, colatitude=None, azimuth=None):
-        # TODO: The broadcasting breaks if the radius is not highest in dimention.
-        # E.g. radius.shape = (7, 1), colatitude.shape = (11, 1, 1), azimuth.shape = (13,), wavenumber.shape = (17,)
-        # will break in `__getitem__` since self._radial[...].shape = (17, 7, 1) but self._angular[...].shape = (11, 1, 13)
-        # To solve this we need to automatically add one extra dimention between the radius and the wavenumber to be able to fit the colatitude.
-        if position is not None:
-            radial_shape = np.broadcast(position[0])
-            colatitude_shape = np.broadcast(position[0])
-            azimuth_shape = np.broadcast(position[0])
-        else:
-            radial_shape = np.broadcast(radius)
-            colatitude_shape = np.broadcast(colatitude)
-            azimuth_shape = np.broadcast(azimuth)
-
-        self._angular = SphericalHarmonics(order=order, colatitude=colatitude_shape, azimuth=azimuth_shape)
-        self._radial = self._radial_cls(order=order, radius=radial_shape)
-        if _shape_utilities.is_value(position):
-            self.evaluate(position=position, wavenumber=wavenumber)
-        elif _shape_utilities.is_value(radius) and _shape_utilities.is_value(colatitude) and _shape_utilities.is_value(azimuth):
-            self.evaluate(radius=radius, colatitude=colatitude, azimuth=azimuth, wavenumber=wavenumber)
+                 radius=None, colatitude=None, azimuth=None, defer_evaluation=False):
+        self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth)
+        self._angular = SphericalHarmonics(order=order, position=self.coordinate, defer_evaluation=defer_evaluation)
+        self._radial = self._radial_cls(order=order, position=self.coordinate, wavenumber=wavenumber, defer_evaluation=defer_evaluation)
 
     def evaluate(self, position=None, wavenumber=None, radius=None, colatitude=None, azimuth=None):
-        if position is not None:
-            radius, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
-        self._radial.evaluate(radius, wavenumber)
-        self._angular.evaluate(colatitude=colatitude, azimuth=azimuth)
+        self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth)
+        if (position is not None) or (radius is not None) or (wavenumber is not None):
+            self._radial.evaluate(self.coordinate, wavenumber=wavenumber)
+        if (position is not None) or (colatitude is not None) or (azimuth is not None):
+            # TODO: We could in principle optimize the case where only a new azimuth angle is given.
+            self._angular.evaluate(self.coordinate)
         return self
 
     @property
     def order(self):
         return self._angular.order
 
-    @property
-    def shape(self):
-        radial = np.empty(self._radial.shape, dtype=[])
-        angular = np.empty(self._angular.shape, dtype=[])
-        return np.broadcast(radial, angular).shape
-
-    @property
-    def ndim(self):
-        return len(self.shape)
-
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
+        new_obj = super().copy(deep=deep)
         new_obj._angular = self._angular.copy(deep=deep)
         new_obj._radial = self._radial.copy(deep=deep)
         return new_obj
