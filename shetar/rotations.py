@@ -1,5 +1,5 @@
 import numpy as np
-from . import coordinates, bases, expansions, _shape_utilities
+from . import coordinates, bases, expansions
 
 
 class ColatitudeRotation(coordinates.OwnerMixin):
@@ -26,12 +26,6 @@ class ColatitudeRotation(coordinates.OwnerMixin):
             new_obj._data = self._data.copy()
         else:
             new_obj._data = self._data
-        return new_obj
-
-    def reshape(self, newshape, *args, **kwargs):
-        new_obj = self.copy()
-        non_shape_dims = new_obj._data.ndim - len(new_obj._colatitude_shape)  # Direct access so that it still works in the Rotation class.
-        new_obj._data = new_obj._data.reshape(new_obj._data.shape[:non_shape_dims] + newshape)
         return new_obj
 
     def _idx(self, order=None, mode_out=None, mode_in=None, index=None):
@@ -226,14 +220,6 @@ class Rotation(ColatitudeRotation):
         else:
             new_obj._primary_phase = self._primary_phase
             new_obj._secondary_phase = self._secondary_phase
-        return new_obj
-
-    def reshape(self, newshape, *args, **kwargs):
-        colat_newshape, primary_newshape, secondary_newshape = _shape_utilities.broadcast_reshape(
-            self._colatitude_shape, self._primary_phase.shape, self._secondary_phase.shape, newshape=newshape)
-        new_obj = super().reshape(colat_newshape)
-        new_obj._primary_phase = np.reshape(new_obj._primary_phase, primary_newshape)
-        new_obj._secondary_phase = np.reshape(new_obj._secondary_phase, secondary_newshape)
         return new_obj
 
     def __getitem__(self, key):

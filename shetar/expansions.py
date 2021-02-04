@@ -40,11 +40,6 @@ class Expansion:
             new_obj._data = self._data
         return new_obj
 
-    def reshape(self, newshape, *args, **kwargs):
-        new_obj = self.copy()
-        new_obj._data = new_obj._data.reshape(new_obj._data.shape[:1 + np.ndim(new_obj.wavenumber)] + tuple(newshape))
-        return new_obj
-
     @property
     def wavenumber(self):
         return self._wavenumber

@@ -1,5 +1,5 @@
 import numpy as np
-from . import coordinates, rotations, expansions, _shape_utilities
+from . import coordinates, rotations, expansions
 
 
 class CoaxialTranslation(coordinates.OwnerMixin):
@@ -51,12 +51,6 @@ class CoaxialTranslation(coordinates.OwnerMixin):
         else:
             new_obj._wavenumber = self._wavenumber
             new_obj._data = self._data
-        return new_obj
-
-    def reshape(self, newshape, *args, **kwargs):
-        new_obj = self.copy()
-        non_shape_dims = new_obj._data.ndim - new_obj.ndim
-        new_obj._data = new_obj._data.reshape(new_obj._data.shape[:non_shape_dims] + tuple(newshape))
         return new_obj
 
     @property
@@ -296,13 +290,6 @@ class Translation(CoaxialTranslation):
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)
         new_obj._rotation = self._rotation.copy(deep=deep)
-        return new_obj
-
-    def reshape(self, newshape, *args, **kwargs):
-        coaxial_newshape, rotation_newshape = _shape_utilities.broadcast_reshape(self._coaxial.shape, self._rotation.shape, newshape=newshape)
-        new_obj = self.copy()
-        new_obj._coaxial = new_obj._coaxial.reshape(coaxial_newshape)
-        new_obj._rotation = new_obj._rotation.reshape(rotation_newshape)
         return new_obj
 
 
