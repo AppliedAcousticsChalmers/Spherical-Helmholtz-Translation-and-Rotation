@@ -263,11 +263,11 @@ class Cartesian(_CartesianConverter):
     def from_coordinate(cls, coordinate):
         return cls(x=coordinate.x, y=coordinate.y, z=coordinate.z)
 
-    def __init__(self, x=0, y=0, z=0, **kwargs):
+    def __init__(self, x=None, y=None, z=None, **kwargs):
         super().__init__(**kwargs)
-        self._x = np.asarray(x)
-        self._y = np.asarray(y)
-        self._z = np.asarray(z)
+        self._x = np.asarray(x if x is not None else 0)
+        self._y = np.asarray(y if y is not None else 0)
+        self._z = np.asarray(z if z is not None else 0)
 
     def copy(self, deep=False):
         if deep:
