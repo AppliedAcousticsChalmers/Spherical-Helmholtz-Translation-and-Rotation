@@ -17,7 +17,10 @@ def new_origin(request):
     r = np.random.uniform(low=1, high=2) * scale
     phi = np.random.uniform(low=0, high=2 * np.pi)
     theta = np.random.uniform(low=0, high=np.pi)
-    new_origin = r * np.stack([np.cos(phi) * np.sin(theta), np.sin(phi) * np.sin(theta), np.cos(theta)])
+    x = r * np.cos(phi) * np.sin(theta)
+    y = r * np.sin(phi) * np.sin(theta)
+    z = r * np.cos(theta)
+    new_origin = np.stack([x, y, z], axis=-1)
     return new_origin
 
 
@@ -27,7 +30,10 @@ def field_points(request):
     r = np.random.uniform(low=5, high=50, size=size)
     phi = np.random.uniform(low=0, high=2 * np.pi, size=size)
     theta = np.random.uniform(low=0, high=np.pi, size=size)
-    field_points = r * np.stack([np.cos(phi) * np.sin(theta), np.sin(phi) * np.sin(theta), np.cos(theta)])
+    x = r * np.cos(phi) * np.sin(theta)
+    y = r * np.sin(phi) * np.sin(theta)
+    z = r * np.cos(theta)
+    field_points = np.stack([x, y, z], axis=-1)
     return field_points
 
 
@@ -50,7 +56,7 @@ def input_order(output_order):
 @pytest.fixture(scope='module')
 def source_expansion(input_order, num_initial_sources):
     source_amplitudes = np.random.normal(size=num_initial_sources) + 1j * np.random.normal(size=num_initial_sources)
-    source_positions = np.random.normal(loc=0, scale=1e-3, size=(3, num_initial_sources))
+    source_positions = np.random.normal(loc=0, scale=1e-3, size=(num_initial_sources, 3))
     source_expansion = shetar.expansions.Expansion(data=source_amplitudes[None, :]).apply(
         shetar.translations.InteriorTranslation(
             input_order=0, output_order=input_order,
@@ -76,7 +82,7 @@ def original_values(original_bases, source_expansion):
 
 @pytest.fixture(scope='module')
 def translated_field_points(field_points, new_origin):
-    translated_field_points = field_points - new_origin.reshape([3] + [1] * (np.ndim(field_points) - 1))
+    translated_field_points = field_points - new_origin.reshape([1] * (np.ndim(field_points) - 1) + [3])
     return translated_field_points
 
 

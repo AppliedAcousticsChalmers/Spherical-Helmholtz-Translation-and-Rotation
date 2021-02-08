@@ -1,26 +1,27 @@
 import numpy as np
-from . import coordinates, rotations, expansions, _shape_utilities
+from . import coordinates, rotations, expansions
 
 
-class CoaxialTranslation:
+class CoaxialTranslation(coordinates.OwnerMixin):
     _default_output_type = expansions.Expansion
 
-    def __init__(self, input_order, output_order, distance=None, wavenumber=None):
+    def __init__(self, input_order, output_order, position=None, radius=None, wavenumber=None, defer_evaluation=False):
         self._input_order = input_order
         self._output_order = output_order
         self._min_order = min(self.input_order, self.output_order)
         self._max_order = max(self.input_order, self.output_order)
-        self._wavenumber = None
+        self._wavenumber = np.asarray(wavenumber)
 
+        self.coordinate = coordinates.Translation.parse_args(position=position, radius=radius)
         num_unique = (
             (self._min_order + 1)**2 * (self._max_order + 1)
             - (self._min_order * (self._min_order + 1)) // 2 * (self._min_order + self._max_order + 2)
             + (self._min_order * (self._min_order - 1) * (self._min_order + 1)) // 6
         )
-        self._data = np.zeros((num_unique,) + np.shape(wavenumber) + np.shape(distance), self._dtype)
+        self._data = np.zeros((num_unique,) + np.shape(wavenumber) + self.coordinate.shapes.radius, self._dtype)
 
-        if _shape_utilities.is_value(distance):
-            self.evaluate(distance=distance, wavenumber=wavenumber)
+        if not defer_evaluation:
+            self.evaluate(position=self.coordinate)
 
     @property
     def order(self):
@@ -36,29 +37,20 @@ class CoaxialTranslation:
 
     @property
     def shape(self):
-        return np.shape(self._data)[(1 + np.ndim(self._wavenumber)):]
-
-    @property
-    def ndim(self):
-        return len(self.shape)
+        return self.coordinate.shapes.radius
 
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
+        new_obj = super().copy(deep=deep)
         new_obj._input_order = self._input_order
         new_obj._output_order = self._output_order
         new_obj._max_order = self._max_order
         new_obj._min_order = self._min_order
-        new_obj._wavenumber = self._wavenumber
         if deep:
+            new_obj._wavenumber = self._wavenumber.copy()
             new_obj._data = self._data.copy()
         else:
+            new_obj._wavenumber = self._wavenumber
             new_obj._data = self._data
-        return new_obj
-
-    def reshape(self, newshape, *args, **kwargs):
-        new_obj = self.copy()
-        non_shape_dims = new_obj._data.ndim - new_obj.ndim
-        new_obj._data = new_obj._data.reshape(new_obj._data.shape[:non_shape_dims] + tuple(newshape))
         return new_obj
 
     @property
@@ -121,9 +113,10 @@ class CoaxialTranslation:
         else:
             return self._data[self._idx(n, p, abs(m))]
 
-    def evaluate(self, distance, wavenumber=None):
+    def evaluate(self, position=None, radius=None, wavenumber=None):
         if wavenumber is not None:
-            self._wavenumber = wavenumber
+            self._wavenumber = np.asarray(wavenumber)
+        self.coordinate = coordinates.Translation.parse_args(position=position, radius=radius)
         # The computation is split in two domains for p, the stored and the buffered.
         # The stored range is p <= P, i.e. the values we are interested in.
         # The buffered range is P < p <= N + P - m, which are values needed to
@@ -137,10 +130,10 @@ class CoaxialTranslation:
 
         # Recurrence buffers
         N, P = self._min_order, self._max_order  # Shorthand for clarity
-        m_buffer = np.zeros((N + 1,) + np.shape(self.wavenumber) + self.shape, dtype=self._dtype)
-        m_minus_one_buffer = np.zeros((N + 1,) + np.shape(self.wavenumber) + self.shape, dtype=self._dtype)
-        n_minus_two_buffer = np.zeros((N + 1,) + np.shape(self.wavenumber) + self.shape, dtype=self._dtype)
-        n_minus_one_buffer = np.zeros((N + 1,) + np.shape(self.wavenumber) + self.shape, dtype=self._dtype)
+        m_buffer = np.zeros((N + 1,) + np.shape(self.wavenumber) + self.coordinate.shapes.radius, dtype=self._dtype)
+        m_minus_one_buffer = np.zeros((N + 1,) + np.shape(self.wavenumber) + self.coordinate.shapes.radius, dtype=self._dtype)
+        n_minus_two_buffer = np.zeros((N + 1,) + np.shape(self.wavenumber) + self.coordinate.shapes.radius, dtype=self._dtype)
+        n_minus_one_buffer = np.zeros((N + 1,) + np.shape(self.wavenumber) + self.coordinate.shapes.radius, dtype=self._dtype)
 
         for m in range(N + 1):  # Main loop over modes
             # Buffer swap for sectorials.
@@ -149,7 +142,7 @@ class CoaxialTranslation:
                 # Somewhat ugly with this if-statement inside the loop,
                 # but the alternative is to duplicate everything else in the loop
                 # for m=0.
-                initial_values = self._recurrence_initialization(order=N + P, radius=distance, wavenumber=self.wavenumber)
+                initial_values = self._recurrence_initialization(order=N + P, radius=self.coordinate.radius, wavenumber=self.wavenumber)
                 for p in range(P):
                     self._data[self._idx(0, p, 0)] = initial_values[p] * (2 * p + 1)**0.5
                 self._data[self._idx(0, P, 0)] = m_buffer[0] = n_minus_one_buffer[0] = initial_values[P] * (2 * P + 1)**0.5
@@ -225,8 +218,8 @@ class CoaxialTranslation:
         if out is None:
             self_shape = self.shape
             expansion_shape = np.shape(expansion)
-            output_shape = np.broadcast(np.empty(self_shape, dtype=[]), np.empty(expansion_shape, dtype=[]))
-            out = self._default_output_type(order=self.input_order if inverse else self.output_order, wavenumber=self.wavenumber, data=output_shape)
+            output_shape = np.broadcast(np.empty(self_shape, dtype=[]), np.empty(expansion_shape, dtype=[])).shape
+            out = self._default_output_type(order=self.input_order if inverse else self.output_order, wavenumber=self.wavenumber, shape=output_shape)
         elif expansion is out:
             raise NotImplementedError('Translations cannot currently be applied in place')
         if not inverse:
@@ -264,76 +257,49 @@ class ExteriorInteriorCoaxialTranslation(CoaxialTranslation):
     _default_output_type = expansions.InteriorExpansion
 
 
-class Translation:
+class Translation(CoaxialTranslation):
     def __init__(self, input_order, output_order, position=None, wavenumber=None,
-                 radius=None, colatitude=None, azimuth=None):
-
-        if position is not None:
-            radial_shape = np.broadcast(position[0])
-            colatitude_shape = np.broadcast(position[0])
-            azimuth_shape = np.broadcast(position[0])
-        else:
-            radial_shape = np.broadcast(radius)
-            colatitude_shape = np.broadcast(colatitude)
-            azimuth_shape = np.broadcast(azimuth)
-
-        self._coaxial = self._coaxial_cls(
-            input_order=input_order, output_order=output_order,
-            distance=radial_shape, wavenumber=wavenumber
-        )
+                 radius=None, colatitude=None, azimuth=None, defer_evaluation=False):
+        coordinate = coordinates.Translation.parse_args(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth)
         self._rotation = rotations.Rotation(
-            order=max(input_order, output_order),
-            colatitude=colatitude_shape, azimuth=azimuth_shape
+            order=max(input_order, output_order), defer_evaluation=True,
+            colatitude=coordinate.colatitude, azimuth=coordinate.azimuth,
         )
-
-        if _shape_utilities.is_value(position):
-            self.evaluate(position=position, wavenumber=wavenumber)
-        elif _shape_utilities.is_value(radius) and _shape_utilities.is_value(colatitude) and _shape_utilities.is_value(azimuth):
-            self.evaluate(radius=radius, colatitude=colatitude, azimuth=azimuth, wavenumber=wavenumber)
+        super().__init__(input_order=input_order, output_order=output_order, position=coordinate, wavenumber=wavenumber, defer_evaluation=defer_evaluation)
 
     def evaluate(self, position=None, wavenumber=None, radius=None, colatitude=None, azimuth=None):
-        if position is not None:
-            radius, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
-        if radius is not None:
-            self._coaxial.evaluate(distance=radius, wavenumber=wavenumber)
-        self._rotation.evaluate(colatitude=colatitude, azimuth=azimuth)
+        self.coordinate = coordinates.Translation.parse_args(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth)
+        if (position is not None) or (radius is not None) or (wavenumber is not None):
+            super().evaluate(position=self.coordinate, wavenumber=wavenumber)
+        if (position is not None) or (colatitude is not None) or (azimuth is not None):
+            self._rotation.evaluate(colatitude=self.coordinate.colatitude, azimuth=self.coordinate.azimuth)
         return self
 
-    def apply(self, expansion, inverse=False):
+    def apply(self, expansion, inverse=False, _only_coaxial=False):
+        if _only_coaxial:
+            return super().apply(expansion, inverse=inverse)
         if not inverse:
-            return expansion.apply(self._rotation, inverse=True).apply(self._coaxial).apply(self._rotation)
+            return expansion.apply(self._rotation, inverse=True).apply(self, _only_coaxial=True).apply(self._rotation)
         else:
             raise NotImplementedError('Inverse translations not implemented yet.')
 
     @property
     def shape(self):
-        return _shape_utilities.broadcast_shapes(self._coaxial.shape, self._rotation.shape, output='new')
-
-    @property
-    def ndim(self):
-        return max(self._coaxial.ndim, self._rotation.ndim)
+        return self.coordinate.shape
 
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
-        new_obj._coaxial = self._coaxial.copy(deep=deep)
+        new_obj = super().copy(deep=deep)
         new_obj._rotation = self._rotation.copy(deep=deep)
         return new_obj
 
-    def reshape(self, newshape, *args, **kwargs):
-        coaxial_newshape, rotation_newshape = _shape_utilities.broadcast_reshape(self._coaxial.shape, self._rotation.shape, newshape=newshape)
-        new_obj = self.copy()
-        new_obj._coaxial = new_obj._coaxial.reshape(coaxial_newshape)
-        new_obj._rotation = new_obj._rotation.reshape(rotation_newshape)
-        return new_obj
+
+class InteriorTranslation(Translation, InteriorCoaxialTranslation):
+    pass
 
 
-class InteriorTranslation(Translation):
-    _coaxial_cls = InteriorCoaxialTranslation
+class ExteriorTranslation(Translation, ExteriorCoaxialTranslation):
+    pass
 
 
-class ExteriorTranslation(Translation):
-    _coaxial_cls = ExteriorCoaxialTranslation
-
-
-class ExteriorInteriorTranslation(Translation):
-    _coaxial_cls = ExteriorInteriorCoaxialTranslation
+class ExteriorInteriorTranslation(Translation, ExteriorInteriorCoaxialTranslation):
+    pass

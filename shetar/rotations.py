@@ -1,46 +1,31 @@
 import numpy as np
-from . import coordinates, bases, expansions, _shape_utilities
+from . import coordinates, bases, expansions
 
 
-class ColatitudeRotation:
-    def __init__(self, order, colatitude=None, **kwargs):
+class ColatitudeRotation(coordinates.OwnerMixin):
+    def __init__(self, order, position=None, colatitude=None, defer_evaluation=False):
+        self.coordinate = coordinates.Rotation.parse_args(position=position, colatitude=colatitude)
         self._order = order
         num_unique = (self.order + 1) * (self.order + 2) * (2 * self.order + 3) // 6
-        self._data = np.zeros((num_unique,) + np.shape(colatitude), dtype=float)
-        if _shape_utilities.is_value(colatitude):
-            # kwargs used to pass azimuth angles from `Rotation._init__` to `Rotation.evaluate`
-            self.evaluate(colatitude=colatitude, **kwargs)
+        self._data = np.zeros((num_unique,) + self.coordinate.shapes.colatitude, dtype=float)
+        if not defer_evaluation:
+            self.evaluate(self.coordinate)
 
     @property
     def order(self):
         return self._order
 
     @property
-    def _colatitude_shape(self):
-        return np.shape(self._data)[1:]
-
-    @property
     def shape(self):
-        # Detour so that we can still access the colatitude shape from the Rotation class
-        return self._colatitude_shape
-
-    @property
-    def ndim(self):
-        return len(self.shape)
+        return self.coordinate.shapes.colatitude
 
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
+        new_obj = super().copy(deep=deep)
         new_obj._order = self._order
         if deep:
             new_obj._data = self._data.copy()
         else:
             new_obj._data = self._data
-        return new_obj
-
-    def reshape(self, newshape, *args, **kwargs):
-        new_obj = self.copy()
-        non_shape_dims = new_obj._data.ndim - len(new_obj._colatitude_shape)  # Direct access so that it still works in the Rotation class.
-        new_obj._data = new_obj._data.reshape(new_obj._data.shape[:non_shape_dims] + newshape)
         return new_obj
 
     def _idx(self, order=None, mode_out=None, mode_in=None, index=None):
@@ -95,8 +80,9 @@ class ColatitudeRotation:
             sign = 1
         return sign * self._data[self._idx(n, p, m)]
 
-    def evaluate(self, colatitude=None):
-        cosine_colatitude = np.cos(colatitude)
+    def evaluate(self, position=None, colatitude=None):
+        self.coordinate = coordinates.Rotation.parse_args(position=position, colatitude=colatitude)
+        cosine_colatitude = np.cos(self.coordinate.colatitude)
         sine_colatitude = (1 - cosine_colatitude**2)**0.5
 
         legendre = bases.AssociatedLegendrePolynomials(order=self.order, x=cosine_colatitude)
@@ -160,11 +146,11 @@ class ColatitudeRotation:
             wavenumber = getattr(expansion, 'wavenumber', None)
             self_shape = self.shape
             expansion_shape = np.shape(expansion)
-            output_shape = np.broadcast(np.empty(self_shape, dtype=[]), np.empty(expansion_shape, dtype=[]))
+            output_shape = np.broadcast(np.empty(self_shape, dtype=[]), np.empty(expansion_shape, dtype=[])).shape
             if isinstance(expansion, expansions.Expansion):
-                out = type(expansion)(order=N, data=output_shape, wavenumber=wavenumber)
+                out = type(expansion)(order=N, shape=output_shape, wavenumber=wavenumber)
             else:
-                out = expansions.Expansion(order=N, data=output_shape, wavenumber=wavenumber)
+                out = expansions.Expansion(order=N, shape=output_shape, wavenumber=wavenumber)
         elif expansion is out:
             raise NotImplementedError('Rotations cannot currently be applied in place')
         if inverse:
@@ -196,33 +182,35 @@ class ColatitudeRotation:
 
 
 class Rotation(ColatitudeRotation):
-    # Subclass of ColatitudeRptation to get access to the `apply` method, which work the same for both types of rotation.
-    def __init__(self, order, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None):
-        if new_z_axis is not None or old_z_axis is not None:
-            colatitude, azimuth, secondary_azimuth = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
-        # Default values for the phases. This has to be set here since the evaluate function only sets new values if new angles are given.
-        self._primary_phase = np.array(1 + 0j)
-        self._secondary_phase = np.array(1 + 0j)
-        # CoalatitudeRotation will pass the azimuth angles through to evaluate.
-        super().__init__(order=order, colatitude=colatitude, azimuth=azimuth, secondary_azimuth=secondary_azimuth)
+    # Subclass of ColatitudeRotation to get access to the `apply` method, which work the same for both types of rotation.
+    def __init__(self, order, position=None, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None, defer_evaluation=False):
+        coordinate = coordinates.Rotation.parse_args(
+            position=position, new_z_axis=new_z_axis, old_z_axis=old_z_axis,
+            colatitude=colatitude, azimuth=azimuth, secondary_azimuth=secondary_azimuth)
+        super().__init__(order=order, position=coordinate, defer_evaluation=defer_evaluation)
 
-    def evaluate(self, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None, **kwargs):
-        if new_z_axis is not None or old_z_axis is not None:
-            colatitude, azimuth, secondary_azimuth = coordinates.z_axes_rotation_angles(new_axis=new_z_axis, old_axis=old_z_axis)
-        if colatitude is not None:
-            # Allows changing the azimuth angles without changing the colatitude.
-            # Useful since changing the azimuth angles is cheap, whilg chanigng
-            # the colatitude is expensive.
-            super().evaluate(colatitude=colatitude, **kwargs)
-        if azimuth is not None:
-            self._primary_phase = np.asarray(np.exp(1j * azimuth))
-        if secondary_azimuth is not None:
-            self._secondary_phase = np.asarray(np.exp(1j * secondary_azimuth))
+    def evaluate(self, position=None, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None):
+        if (position is None) and (new_z_axis is None) and (old_z_axis is None) and (colatitude is None):
+            # Allows chaing the azimuth angles without reevaluating the colatitude rotation.
+            # This might be useful sometimes since changing the azimuth angles is much cheaper than
+            # changing the colatitude angle. If we anyhow change the colatitude roration, reevaluating the
+            # azimuth rotations will be very cheap so we won't bother with checking if we could skip it.
+            if azimuth is not None:
+                self._primary_phase = np.asarray(np.exp(1j * azimuth))
+            if secondary_azimuth is not None:
+                self._secondary_phase = np.asarray(np.exp(1j * secondary_azimuth))
+        else:
+            self.coordinate = coordinates.Rotation.parse_args(
+                position=position, new_z_axis=new_z_axis, old_z_axis=old_z_axis,
+                colatitude=colatitude, azimuth=azimuth, secondary_azimuth=secondary_azimuth)
+            super().evaluate(position=self.coordinate)
+            self._primary_phase = np.asarray(np.exp(1j * self.coordinate.azimuth))
+            self._secondary_phase = np.asarray(np.exp(1j * self.coordinate.secondary_azimuth))
         return self
 
     @property
     def shape(self):
-        return _shape_utilities.broadcast_shapes(self._colatitude_shape, self._primary_phase.shape, self._secondary_phase.shape, output='new')
+        return self.coordinate.shape
 
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)
@@ -232,14 +220,6 @@ class Rotation(ColatitudeRotation):
         else:
             new_obj._primary_phase = self._primary_phase
             new_obj._secondary_phase = self._secondary_phase
-        return new_obj
-
-    def reshape(self, newshape, *args, **kwargs):
-        colat_newshape, primary_newshape, secondary_newshape = _shape_utilities.broadcast_reshape(
-            self._colatitude_shape, self._primary_phase.shape, self._secondary_phase.shape, newshape=newshape)
-        new_obj = super().reshape(colat_newshape)
-        new_obj._primary_phase = np.reshape(new_obj._primary_phase, primary_newshape)
-        new_obj._secondary_phase = np.reshape(new_obj._secondary_phase, secondary_newshape)
         return new_obj
 
     def __getitem__(self, key):

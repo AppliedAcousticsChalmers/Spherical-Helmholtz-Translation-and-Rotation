@@ -46,8 +46,8 @@ def radius(request):
 
 
 @pytest.fixture(scope='module', params=[
-    np.random.normal(size=3), np.random.normal(size=(3, 25)),
-    pytest.param(np.random.normal(size=(3, 7, 11)), marks=pytest.mark.slow)
+    np.random.normal(size=3), np.random.normal(size=(25, 3)),
+    pytest.param(np.random.normal(size=(7, 11, 3)), marks=pytest.mark.slow)
 ])
 def position(request):
     return request.param
@@ -97,10 +97,10 @@ def test_spherical_harmoics_values(order, colatitude, azimuth):
 
 
 def test_regular_base_values(order, position, wavenumber):
-    radius = np.sum(position**2, axis=0) ** 0.5
+    radius = np.sum(position**2, axis=-1) ** 0.5
     kr = radius * wavenumber.reshape(wavenumber.shape + (1,) * np.ndim(radius))
-    colatitude = np.arccos(position[2] / radius)
-    azimuth = np.arctan2(position[1], position[0])
+    colatitude = np.arccos(position[..., 2] / radius)
+    azimuth = np.arctan2(position[..., 1], position[..., 0])
 
     implemented = shetar.bases.RegularBase(order=order, position=position, wavenumber=wavenumber)
     for n in range(order + 1):
@@ -114,10 +114,10 @@ def test_regular_base_values(order, position, wavenumber):
 
 
 def test_singular_base_values(order, position, wavenumber):
-    radius = np.sum(position**2, axis=0) ** 0.5
+    radius = np.sum(position**2, axis=-1) ** 0.5
     kr = radius * wavenumber.reshape(wavenumber.shape + (1,) * np.ndim(radius))
-    colatitude = np.arccos(position[2] / radius)
-    azimuth = np.arctan2(position[1], position[0])
+    colatitude = np.arccos(position[..., 2] / radius)
+    azimuth = np.arctan2(position[..., 1], position[..., 0])
 
     implemented = shetar.bases.SingularBase(order=order, position=position, wavenumber=wavenumber)
     for n in range(order + 1):

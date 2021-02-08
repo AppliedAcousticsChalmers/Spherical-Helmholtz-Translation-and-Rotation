@@ -17,7 +17,10 @@ def new_origin(request):
     r = np.random.normal(loc=r, scale=r / 10)
     phi = np.random.uniform(low=0, high=2 * np.pi)
     theta = np.random.uniform(low=0, high=np.pi)
-    new_origin = r * np.stack([np.cos(phi) * np.sin(theta), np.sin(phi) * np.sin(theta), np.cos(theta)])
+    x = r * np.cos(phi) * np.sin(theta)
+    y = r * np.sin(phi) * np.sin(theta)
+    z = r * np.cos(theta)
+    new_origin = np.stack([x, y, z], axis=-1)
     return new_origin
 
 
@@ -45,7 +48,7 @@ def input_order(output_order, new_origin):
 @pytest.fixture(scope='module')
 def source_expansion(input_order, num_initial_sources):
     source_amplitudes = np.random.normal(size=num_initial_sources) + 1j * np.random.normal(size=num_initial_sources)
-    source_positions = np.random.normal(loc=0, scale=1e-3, size=(3, num_initial_sources))
+    source_positions = np.random.normal(loc=0, scale=1e-3, size=(num_initial_sources, 3))
     source_expansion = shetar.expansions.Expansion(data=source_amplitudes[None, :]).apply(
         shetar.translations.InteriorTranslation(
             input_order=0, output_order=input_order,
@@ -71,7 +74,7 @@ def original_values(original_bases, source_expansion):
 
 @pytest.fixture(scope='module')
 def field_points(translated_field_points, new_origin):
-    field_points = translated_field_points + new_origin.reshape([3] + [1] * (np.ndim(translated_field_points) - 1))
+    field_points = translated_field_points + new_origin.reshape([1] * (np.ndim(translated_field_points) - 1) + [3])
     return field_points
 
 
@@ -80,7 +83,10 @@ def translated_field_points(field_point_shape):
     r = np.random.uniform(low=0.1, high=1, size=field_point_shape)
     phi = np.random.uniform(low=0, high=2 * np.pi, size=field_point_shape)
     theta = np.random.uniform(low=0, high=np.pi, size=field_point_shape)
-    translated_field_points = r * np.stack([np.cos(phi) * np.sin(theta), np.sin(phi) * np.sin(theta), np.cos(theta)])
+    x = r * np.cos(phi) * np.sin(theta)
+    y = r * np.sin(phi) * np.sin(theta)
+    z = r * np.cos(theta)
+    translated_field_points = np.stack([x, y, z], axis=-1)
     return translated_field_points
 
 

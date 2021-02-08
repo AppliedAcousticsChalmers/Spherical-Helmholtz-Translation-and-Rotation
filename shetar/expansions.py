@@ -1,21 +1,22 @@
 import numpy as np
-from . import coordinates, _shape_utilities
+from . import coordinates
 
 
 class Expansion:
-    def __init__(self, order=None, data=None, wavenumber=None):
+    def __init__(self, order=None, data=None, wavenumber=None, shape=None):
         self._wavenumber = wavenumber
-        if _shape_utilities.is_value(data):
+        if data is not None:
             self._data = data
             if order is not None and self.order != order:
                 raise ValueError(f'Received data of order {self.order} in conflict with specified order {order}')
             if np.shape(wavenumber) != np.shape(data)[1:(np.ndim(wavenumber) + 1)]:
                 raise ValueError(f'Received wavenumber of shape {np.shape(wavenumber)} in conflict with data of shape {np.shape(data)}')
-        elif type(data) == np.broadcast and order is None:
-            self._data = np.zeros(np.shape(data), dtype=complex)
+            if shape is not None and np.shape(data)[2:] != shape:
+                raise ValueError(f'Received explicit shape {shape} in conflict with data of shape {np.shape(data)}')
         elif order is not None:
+            shape = tuple() if shape is None else (shape,) if type(shape) is int else tuple(shape)
             num_unique = (order + 1) ** 2
-            self._data = np.zeros((num_unique,) + np.shape(wavenumber) + np.shape(data), dtype=complex)
+            self._data = np.zeros((num_unique,) + np.shape(wavenumber) + shape, dtype=complex)
         else:
             raise ValueError('Cannot initialize expansion without either raw data or known order')
 
@@ -38,11 +39,6 @@ class Expansion:
             new_obj._data = self._data.copy()
         else:
             new_obj._data = self._data
-        return new_obj
-
-    def reshape(self, newshape, *args, **kwargs):
-        new_obj = self.copy()
-        new_obj._data = new_obj._data.reshape(new_obj._data.shape[:1 + np.ndim(new_obj.wavenumber)] + tuple(newshape))
         return new_obj
 
     @property
@@ -207,10 +203,9 @@ def plane_wave(order, strength=1, colatitude=None, azimuth=None, wavenumber=None
     in the field, and :math:`\vec k` is the wavevector.
     """
     from .bases import SphericalHarmonics
-    if wavevector is not None:
-        wavenumber, colatitude, azimuth = coordinates.cartesian_2_spherical(wavevector)
-    expansion = InteriorExpansion(order=order, data=np.broadcast(colatitude, azimuth), wavenumber=wavenumber)
-    spherical_harmonics = SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
+    wave_coordinate = coordinates.SpatialCoordinate.parse_args(position=wavevector, radius=wavenumber, colatitude=colatitude, azimuth=azimuth)
+    expansion = InteriorExpansion(order=order, shape=wave_coordinate.shapes.angular, wavenumber=wave_coordinate.radius)
+    spherical_harmonics = SphericalHarmonics(order=order, position=wave_coordinate)
     strength = strength * 4 * np.pi
     for n in range(order + 1):
         for m in range(-n, n + 1):
@@ -259,9 +254,9 @@ def circular_ring(
     ring, :math:`r` is the distance from the source, and :math:`\theta` is the
     angle between the position vector and the source normal.
     """
-    if wavevector is not None:
-        wavenumber, colatitude, azimuth = coordinates.cartesian_2_spherical(wavevector)
-    expansion = ExteriorExpansion(order=order, wavenumber=wavenumber, data=np.broadcast(colatitude, azimuth))
+    wave_coordinate = coordinates.SpatialCoordinate.parse_args(position=wavevector, radius=wavenumber, colatitude=colatitude, azimuth=azimuth)
+    wavenumber = wave_coordinate.radius
+    expansion = ExteriorExpansion(order=order, wavenumber=wavenumber, shape=wave_coordinate.shapes.angular)
     strength = strength * wavenumber * 1j / 2
     from scipy.special import spherical_jn, gamma
     even_n = np.arange(0, order + 1, 2)
