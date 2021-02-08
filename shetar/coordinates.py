@@ -225,7 +225,7 @@ class _CartesianConverter(SpatialCoordinate):
     def colatitude(self):
         with np.errstate(invalid='ignore'):
             r = self.radius
-            return np.arccos(np.where(r == 0, 0, self.z / r))
+            return np.arccos(np.where(r == 0, 1, np.clip(self.z / r, -1, 1)))
 
     @property
     def azimuth(self):
