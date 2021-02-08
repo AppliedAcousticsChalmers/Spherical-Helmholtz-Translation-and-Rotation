@@ -44,7 +44,7 @@ def radius(x, y, z):
 @pytest.fixture(scope='module')
 def colatitude(z, radius):
     clipped = np.clip(z / radius, -1, 1)
-    replaced = np.nan_to_num(clipped, nan=0, neginf=0, posinf=0)
+    replaced = np.nan_to_num(clipped, nan=1, neginf=1, posinf=1)
     return np.arccos(replaced)
 
 
