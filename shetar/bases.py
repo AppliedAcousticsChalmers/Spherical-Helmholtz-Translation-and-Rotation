@@ -1,16 +1,19 @@
 import numpy as np
 import scipy.special
 from . import coordinates
-from . import _shape_utilities
 
 
-class LegendrePolynomials:
-    def __init__(self, order, x=None, normalization='orthonormal'):
+class LegendrePolynomials(coordinates.OwnerMixin):
+    def __init__(self, order, position=None, colatitude=None, x=None, normalization='orthonormal', defer_evaluation=False):
+        if x is not None:
+            self.coordinate = coordinates.NonspatialCoordinate(x=x)
+        else:
+            self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
         self.normalization = normalization
-        self._data = np.zeros((order + 1,) + np.shape(x), dtype=float)
+        self._data = np.zeros((order + 1,) + self.shape, dtype=float)
 
-        if _shape_utilities.is_value(x):
-            self.evaluate(x)
+        if not defer_evaluation:
+            self.evaluate(self.coordinate)
 
     @property
     def order(self):
@@ -18,14 +21,12 @@ class LegendrePolynomials:
 
     @property
     def shape(self):
-        return self._data.shape[1:]
-
-    @property
-    def ndim(self):
-        return len(self.shape)
+        if isinstance(self.coordinate, coordinates.NonspatialCoordinate):
+            return self.coordinate.shape
+        return self.coordinate.shapes.colatitude
 
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
+        new_obj = super().copy(deep=deep)
         new_obj.normalization = self.normalization
         new_obj._order = self.order
         if deep:
@@ -40,16 +41,19 @@ class LegendrePolynomials:
                 new_obj._x = self._x
         return new_obj
 
-    def reshape(self, newshape, *args, **kwargs):
-        # The *args and **kwargs are needed to work correctly with np.reshape as a function.
-        new_obj = self.copy()
-        new_obj._data = np.reshape(new_obj._data, new_obj._data.shape[:1] + tuple(newshape))
-        if hasattr(new_obj, '_x'):
-            new_obj._x = np.reshape(new_obj._x, newshape)
-        return new_obj
+    @property
+    def _x(self):
+        if isinstance(self.coordinate, coordinates.NonspatialCoordinate):
+            return self.coordinate.x
+        if isinstance(self.coordinate, coordinates.SpatialCoordinate):
+            return np.cos(self.coordinate.colatitude)
 
-    def evaluate(self, x):
-        self._x = x = np.asarray(x)
+    def evaluate(self, position=None, colatitude=None, x=None):
+        if x is not None:
+            self.coordinate = coordinates.NonspatialCoordinate(x=x)
+        else:
+            self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
+        x = self._x
         self._data[0] = 1 / 2**0.5
         if self.order > 0:
             self._data[1] = x * 1.5**0.5
@@ -93,20 +97,28 @@ class LegendrePolynomials:
 
 
 class AssociatedLegendrePolynomials(LegendrePolynomials):
-    def __init__(self, order, x=None, normalization='orthonormal'):
+    def __init__(self, order, position=None, colatitude=None, x=None, normalization='orthonormal', defer_evaluation=False):
+        if x is not None:
+            self.coordinate = coordinates.NonspatialCoordinate(x=x)
+        else:
+            self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
         self.normalization = normalization
         num_unique = (order + 1) * (order + 2) // 2
-        self._data = np.zeros((num_unique,) + np.shape(x), dtype=float)
+        self._data = np.zeros((num_unique,) + self.shape, dtype=float)
 
-        if _shape_utilities.is_value(x):
-            self.evaluate(x)
+        if not defer_evaluation:
+            self.evaluate(self.coordinate)
 
     @property
     def order(self):
         return int((8 * self._data.shape[0] + 1)**0.5 - 3) // 2
 
-    def evaluate(self, x):
-        self._x = x = np.asarray(x)
+    def evaluate(self, position=None, colatitude=None, x=None):
+        if x is not None:
+            self.coordinate = coordinates.NonspatialCoordinate(x=x)
+        else:
+            self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
+        x = self._x
         one_minus_x_square = 1 - x**2
 
         # Access the data directly to bypass the normalization code in the getter.
@@ -166,25 +178,24 @@ class AssociatedLegendrePolynomials(LegendrePolynomials):
         return value
 
 
-class _RadialBaseClass:
-    def __init__(self, order, radius=None, wavenumber=None):
+class _RadialBaseClass(coordinates.OwnerMixin):
+    def __init__(self, order, position=None, radius=None, wavenumber=None, defer_evaluation=False):
+        self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, radius=radius)
         self._order = order
         self._wavenumber = wavenumber
+        if not defer_evaluation:
+            self.evaluate(self.coordinate)
 
-        if _shape_utilities.is_value(radius):
-            self.evaluate(radius, wavenumber)
-        else:
-            self._data = np.broadcast(radius)
-
-    def evaluate(self, radius, wavenumber=None):
+    def evaluate(self, position=None, radius=None, wavenumber=None):
+        self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, radius=radius)
         if wavenumber is not None:
             self._wavenumber = wavenumber
         if self.wavenumber is None:
-            x = radius
+            x = self.coordinate.radius
         else:
-            x = radius * np.reshape(wavenumber, np.shape(wavenumber) + (1,) * np.ndim(radius))
+            x = self.coordinate.radius * np.reshape(self.wavenumber, np.shape(self.wavenumber) + (1,) * self.ndim)
 
-        order = np.arange(self.order + 1).reshape((-1,) + (1,) * (np.ndim(self.wavenumber) + len(np.shape(radius))))
+        order = np.arange(self.order + 1).reshape((-1,) + (1,) * (np.ndim(self.wavenumber) + self.ndim))
         self._data = self._radial_func(order, x)
         return self
 
@@ -194,26 +205,16 @@ class _RadialBaseClass:
 
     @property
     def shape(self):
-        return np.shape(self._data)[1 + np.ndim(self.wavenumber):]
-
-    @property
-    def ndim(self):
-        return len(self.shape)
+        return self.coordinate.shapes.radius
 
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
+        new_obj = super().copy(deep=deep)
         new_obj._order = self.order
         new_obj._wavenumber = self.wavenumber
         if deep:
             new_obj._data = self._data.copy()
         else:
             new_obj._data = self._data
-        return new_obj
-
-    def reshape(self, newshape, *args, **kwargs):
-        new_obj = self.copy()
-        non_shape_dims = self._data.ndim - self.ndim
-        new_obj._data = np.reshape(new_obj._data, new_obj._data.shape[:non_shape_dims] + tuple(newshape))
         return new_obj
 
     def __getitem__(self, key):
@@ -240,31 +241,22 @@ class DualRadialBase(_RadialBaseClass):
         neumann = scipy.special.spherical_yn(order, x, derivative=False)
         return np.stack([bessel, bessel + 1j * neumann], axis=1)
 
-    @property
-    def shape(self):
-        return np.shape(self._data)[2 + np.ndim(self.wavenumber):]
 
-
-class SphericalHarmonics:
-    def __init__(self, order, position=None, colatitude=None, azimuth=None, *args, **kwargs):
-        if position is not None:
-            colatitude_shape = azimuth_shape = np.broadcast(position[0])
+class SphericalHarmonics(coordinates.OwnerMixin):
+    def __init__(self, order, position=None, colatitude=None, azimuth=None, defer_evaluation=False, *args, **kwargs):
+        self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude, azimuth=azimuth)
+        self._legendre = AssociatedLegendrePolynomials(order, position=self.coordinate, normalization='orthonormal', defer_evaluation=defer_evaluation)
+        if not defer_evaluation:
+            self.evaluate(self.coordinate)
         else:
-            colatitude_shape = np.broadcast(colatitude)
-            azimuth_shape = np.broadcast(azimuth)
-        self._legendre = AssociatedLegendrePolynomials(order, x=colatitude_shape, normalization='orthonormal')
-        self._azimuth = azimuth_shape
-        if _shape_utilities.is_value(position):
-            self.evaluate(position=position)
-        elif _shape_utilities.is_value(azimuth) and _shape_utilities.is_value(colatitude):
-            self.evaluate(colatitude=colatitude, azimuth=azimuth)
+            self._phase = np.ones(self.shape, complex)
 
     def evaluate(self, position=None, colatitude=None, azimuth=None):
-        if position is not None:
-            _, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
-        cosine_colatitude = np.cos(colatitude)
-        self._legendre.evaluate(cosine_colatitude)
-        self._azimuth = np.asarray(azimuth if np.iscomplexobj(azimuth) else np.exp(1j * azimuth))
+        self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude, azimuth=azimuth)
+        if (position is not None) or (colatitude is not None):
+            self._legendre.evaluate(position=self.coordinate)
+        if (position is not None) or (azimuth is not None):
+            self._phase = np.asarray(np.exp(1j * self.coordinate.azimuth))
         return self
 
     def apply(self, expansion):
@@ -276,7 +268,7 @@ class SphericalHarmonics:
 
     def __getitem__(self, key):
         order, mode = key
-        return self._legendre[order, mode] * self._azimuth ** mode / (2 * np.pi)**0.5
+        return self._legendre[order, mode] * self._phase ** mode / (2 * np.pi)**0.5
 
     @property
     def order(self):
@@ -284,84 +276,42 @@ class SphericalHarmonics:
 
     @property
     def shape(self):
-        return _shape_utilities.broadcast_shapes(self._legendre.shape, self._azimuth.shape, output='new')
-
-    @property
-    def ndim(self):
-        return len(self.shape)
+        return self.coordinate.shapes.angular
 
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
+        new_obj = super().copy(deep=deep)
         new_obj._legendre = self._legendre.copy(deep=deep)
         if deep:
-            new_obj._azimuth = self._azimuth.copy()
+            new_obj._phase = self._phase.copy()
         else:
-            new_obj._azimuth = self._azimuth
-        return new_obj
-
-    def reshape(self, newshape, *args, **kwargs):
-        new_obj = self.copy()
-        legendre_newshape, azimuth_newshape = _shape_utilities.broadcast_reshape(self._legendre.shape, self._azimuth.shape, newshape=newshape)
-        new_obj._legendre = new_obj._legendre.reshape(legendre_newshape)
-        new_obj._azimuth = new_obj._azimuth.reshape(azimuth_newshape)
+            new_obj._phase = self._phase
         return new_obj
 
 
-class SphericalBase:
+class SphericalBase(coordinates.OwnerMixin):
     def __init__(self, order, position=None, wavenumber=None,
-                 radius=None, colatitude=None, azimuth=None):
-        # TODO: The broadcasting breaks if the radius is not highest in dimention.
-        # E.g. radius.shape = (7, 1), colatitude.shape = (11, 1, 1), azimuth.shape = (13,), wavenumber.shape = (17,)
-        # will break in `__getitem__` since self._radial[...].shape = (17, 7, 1) but self._angular[...].shape = (11, 1, 13)
-        # To solve this we need to automatically add one extra dimention between the radius and the wavenumber to be able to fit the colatitude.
-        if position is not None:
-            radial_shape = np.broadcast(position[0])
-            colatitude_shape = np.broadcast(position[0])
-            azimuth_shape = np.broadcast(position[0])
-        else:
-            radial_shape = np.broadcast(radius)
-            colatitude_shape = np.broadcast(colatitude)
-            azimuth_shape = np.broadcast(azimuth)
-
-        self._angular = SphericalHarmonics(order=order, colatitude=colatitude_shape, azimuth=azimuth_shape)
-        self._radial = self._radial_cls(order=order, radius=radial_shape)
-        if _shape_utilities.is_value(position):
-            self.evaluate(position=position, wavenumber=wavenumber)
-        elif _shape_utilities.is_value(radius) and _shape_utilities.is_value(colatitude) and _shape_utilities.is_value(azimuth):
-            self.evaluate(radius=radius, colatitude=colatitude, azimuth=azimuth, wavenumber=wavenumber)
+                 radius=None, colatitude=None, azimuth=None, defer_evaluation=False):
+        self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth)
+        self._angular = SphericalHarmonics(order=order, position=self.coordinate, defer_evaluation=defer_evaluation)
+        self._radial = self._radial_cls(order=order, position=self.coordinate, wavenumber=wavenumber, defer_evaluation=defer_evaluation)
 
     def evaluate(self, position=None, wavenumber=None, radius=None, colatitude=None, azimuth=None):
-        if position is not None:
-            radius, colatitude, azimuth = coordinates.cartesian_2_spherical(position)
-        self._radial.evaluate(radius, wavenumber)
-        self._angular.evaluate(colatitude=colatitude, azimuth=azimuth)
+        self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth)
+        if (position is not None) or (radius is not None) or (wavenumber is not None):
+            self._radial.evaluate(self.coordinate, wavenumber=wavenumber)
+        if (position is not None) or (colatitude is not None) or (azimuth is not None):
+            # TODO: We could in principle optimize the case where only a new azimuth angle is given.
+            self._angular.evaluate(self.coordinate)
         return self
 
     @property
     def order(self):
         return self._angular.order
 
-    @property
-    def shape(self):
-        radial = np.empty(self._radial.shape, dtype=[])
-        angular = np.empty(self._angular.shape, dtype=[])
-        return np.broadcast(radial, angular).shape
-
-    @property
-    def ndim(self):
-        return len(self.shape)
-
     def copy(self, deep=False):
-        new_obj = type(self).__new__(type(self))
+        new_obj = super().copy(deep=deep)
         new_obj._angular = self._angular.copy(deep=deep)
         new_obj._radial = self._radial.copy(deep=deep)
-        return new_obj
-
-    def reshape(self, newshape, *args, **kwargs):
-        new_obj = self.copy()
-        angular_newshape, radial_newshape = _shape_utilities.broadcast_reshape(self._angular.shape, self._radial.shape, newshape=newshape)
-        new_obj._angular = new_obj._angular.reshape(angular_newshape)
-        new_obj._radial = new_obj._radial.reshape(radial_newshape)
         return new_obj
 
     @property
