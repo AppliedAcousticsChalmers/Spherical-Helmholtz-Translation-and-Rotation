@@ -234,7 +234,7 @@ def monopole(strength=1, order=0, wavenumber=1, position=None, domain='exterior'
     source and :math:`k` is the wavenubmer.
     """
     strength = strength * wavenumber * 1j / (4 * np.pi)**0.5
-    expansion = ExteriorExpansion(order=order, wavenumber=wavenumber)
+    expansion = ExteriorExpansion(order=order if position is None else 0, wavenumber=wavenumber)
     expansion[0, 0] = strength
     if position is not None:
         expansion = expansion.translate(order=order, position=position, domain=domain)
@@ -243,7 +243,7 @@ def monopole(strength=1, order=0, wavenumber=1, position=None, domain='exterior'
 
 def circular_ring(
         order, radius, strength=1,
-        colatitude=0, azimuth=None, wavenumber=None, wavevector=None,
+        colatitude=None, azimuth=None, wavenumber=None, wavevector=None,
         position=None, domain='exterior'):
     r"""Create a circular ring source expansion.
 
@@ -259,15 +259,16 @@ def circular_ring(
     expansion = ExteriorExpansion(order=order, wavenumber=wavenumber, shape=wave_coordinate.shapes.angular)
     strength = strength * wavenumber * 1j / 2
     from scipy.special import spherical_jn, gamma
-    even_n = np.arange(0, order + 1, 2)
+    ka = wavenumber * radius
+    even_n = np.arange(0, order + 1, 2).reshape([-1] + [1] * np.ndim(ka))
     # values = np.pi * radius * spherical_jn(even_n, wavenumber * radius) * (2 * even_n + 1)**0.5 / (gamma(even_n / 2 + 1) * gamma(0.5 - even_n / 2))
-    values = strength * spherical_jn(even_n, wavenumber * radius) * (2 * even_n + 1)**0.5 / (gamma(even_n / 2 + 1) * gamma(0.5 - even_n / 2))
+    values = strength * spherical_jn(even_n, ka) * (2 * even_n + 1)**0.5 / (gamma(even_n / 2 + 1) * gamma(0.5 - even_n / 2))
     # TODO: This seems to give about the right shape, but the overall scale is not correct.
     # We need to look at this derivation and compare ot to a derivation of the simple free-field solution in order to get
     # the "strength" of the source.
     for value, n in zip(values, even_n):
         expansion[n, 0] = value
-    if colatitude != 0:
+    if colatitude is not None and np.any(colatitude != 0):
         expansion = expansion.rotate(colatitude=colatitude, azimuth=azimuth)
     if position is not None:
         expansion = expansion.translate(position=position, domain=domain)

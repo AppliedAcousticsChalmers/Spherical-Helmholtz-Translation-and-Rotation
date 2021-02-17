@@ -245,7 +245,7 @@ class DualRadialBase(_RadialBaseClass):
 class SphericalHarmonics(coordinates.OwnerMixin):
     def __init__(self, order, position=None, colatitude=None, azimuth=None, defer_evaluation=False, *args, **kwargs):
         self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude, azimuth=azimuth)
-        self._legendre = AssociatedLegendrePolynomials(order, position=self.coordinate, normalization='orthonormal', defer_evaluation=defer_evaluation)
+        self._legendre = AssociatedLegendrePolynomials(order, position=self.coordinate, normalization='orthonormal', defer_evaluation=True)
         if not defer_evaluation:
             self.evaluate(self.coordinate)
         else:

@@ -1,3 +1,7 @@
 build/
 .coverage
 shetar.egg-info
+*.pyc
+.ipynb_checkpoints/
+.eggs/
+.pytest_cache/
