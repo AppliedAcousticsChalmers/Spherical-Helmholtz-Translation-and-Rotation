@@ -86,7 +86,6 @@ def associated_legendre_polynomials(x, order=None, out=None):
     return out
 
 
-
 @cython.boundscheck(False)
 @cython.cdivision(True)
 cdef int associated_legendre_index(int order, int mode) nogil:
