@@ -35,6 +35,50 @@ def legendre_polynomials(x, order=None, out=None):
     return out
 
 
+def legendre_contraction(expansion_data, base_data, out=None):
+    output_shape, expansion_shape, base_shape = broadcast_shapes(
+        expansion_data.shape[:-1], base_data.shape[:-1]
+    )
+
+    expansion_order = expansion_data.shape[-1]
+    base_order = base_data.shape[-1]
+    output_order = min(expansion_order, base_order)
+
+    if out is None:
+        out = np.zeros(output_shape)
+    elif out.shape != output_shape:
+        raise ValueError(f'Cannot use array of shape {out.shape} as output array for contraction between expansion with shape {expansion_shape} and bases with shape {base_shape}')
+
+    cdef:
+        double[:, :] exp_cy = expansion_data.reshape((-1, expansion_order))
+        double[:, :] base_cy = base_data.reshape((-1, base_order))
+        double[:] out_cy = out.reshape(-1)
+        Py_ssize_t n, N = output_order
+
+    if out.ndim == 0:
+        # No loop over elements.
+        with cython.boundscheck(False), nogil:
+            for n in range(N):
+                out_cy[0] += exp_cy[0, n] * base_cy[0, n]
+        return out
+
+    cdef:
+        Py_ssize_t[:] exp_stride = prepare_strides(expansion_shape, output_shape)
+        Py_ssize_t[:] base_stride = prepare_strides(base_shape, output_shape)
+        Py_ssize_t[:] out_stride = prepare_strides(output_shape, output_shape)
+        Py_ssize_t exp_idx, base_idx, out_idx
+        Py_ssize_t num_elements = out.size, ndim = out.ndim
+    
+    with cython.boundscheck(False), cython.wraparound(False), cython.cdivision(True), nogil:
+        for out_idx in prange(num_elements):
+            exp_idx = broadcast_index(out_idx, exp_stride, out_stride, ndim)
+            base_idx = broadcast_index(out_idx, base_stride, out_stride, ndim)
+            for n in range(N):
+                out_cy[out_idx] += exp_cy[exp_idx, n] * base_cy[base_idx, n]
+
+    return out
+
+
 def associated_legendre_polynomials(x, order=None, out=None):
     if order is None and out is None:
         raise ValueError('Cannot calculate associated Legendre polynomials without receiving either the output array or the order')
