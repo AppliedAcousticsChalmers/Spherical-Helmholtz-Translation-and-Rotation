@@ -136,6 +136,71 @@ def associated_legendre_polynomials(x, order=None, out=None):
                     data[idx_elem, idx_m2] *= one_minus_x_square[idx_elem] ** (0.5 * m + 1)
                 # Normalization for (n, 1) components. (n, 0) needs no modification.
                 data[idx_elem, idx_m1] *= one_minus_x_square[idx_elem] ** 0.5
+    return out
+
+
+def associated_legendre_contraction(expansion_data, base_data, out=None):
+    output_shape, expansion_shape, base_shape = broadcast_shapes(
+        expansion_data.shape[:-1], base_data.shape[:-1]
+    )
+
+    base_order = int((8 * base_data.shape[-1] + 1)**0.5 - 3) // 2
+    expansion_order = int(expansion_data.shape[-1] ** 0.5) - 1
+    output_order = min(base_order, expansion_order)
+
+    if out is None:
+        out = np.zeros(output_shape)
+    elif out.shape != output_shape:
+        raise ValueError(f'Cannot use array of shape {out.shape} as output array for contraction between expansion with shape {expansion_shape} and bases with shape {base_shape}')
+
+    cdef:
+        double[:, :] exp_cy = expansion_data.reshape((-1, expansion_data.shape[-1]))
+        double[:, :] base_cy = base_data.reshape((-1, base_data.shape[-1]))
+        double[:] out_cy = out.reshape(-1)
+        Py_ssize_t n, m, exp_idx, exp_idx_neg, base_idx, N = output_order
+        int sign
+
+    if out.ndim == 0:
+        # No loop over elements.
+        with cython.boundscheck(False), cython.cdivision(True), cython.wraparound(False), nogil:
+            for n in range(N + 1):
+                exp_idx = spherical_expansion_index(n, 0)
+                base_idx = associated_legendre_index(n, 0)
+                out_cy[0] += exp_cy[0, exp_idx] * base_cy[0, base_idx]
+
+                sign = -1
+                for m in range(1, n + 1):
+                    exp_idx = spherical_expansion_index(n, m)
+                    exp_idx_neg = spherical_expansion_index(n, -m)
+                    base_idx = associated_legendre_index(n, m)
+                    out_cy[0] += (exp_cy[0, exp_idx] + exp_cy[0, exp_idx_neg] * sign) * base_cy[0, base_idx]
+                    sign = - sign
+        return out
+
+    cdef:
+        Py_ssize_t[:] exp_stride = prepare_strides(expansion_shape, output_shape)
+        Py_ssize_t[:] base_stride = prepare_strides(base_shape, output_shape)
+        Py_ssize_t[:] out_stride = prepare_strides(output_shape, output_shape)
+        Py_ssize_t exp_elem_idx, base_elem_idx, out_elem_idx
+        Py_ssize_t num_elements = out.size, ndim = out.ndim
+
+    with cython.boundscheck(False), cython.cdivision(True), cython.wraparound(False), nogil:
+        for out_elem_idx in prange(num_elements):
+            exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
+            base_elem_idx = broadcast_index(out_elem_idx, base_stride, out_stride, ndim)
+
+            for n in range(N + 1):
+                exp_idx = spherical_expansion_index(n, 0)
+                base_idx = associated_legendre_index(n, 0)
+                out_cy[out_elem_idx] += exp_cy[exp_elem_idx, exp_idx] * base_cy[base_elem_idx, base_idx]
+
+                sign = -1
+                for m in range(1, n + 1):
+                    exp_idx = spherical_expansion_index(n, m)
+                    exp_idx_neg = spherical_expansion_index(n, -m)
+                    base_idx = associated_legendre_index(n, m)
+                    out_cy[out_elem_idx] += (exp_cy[exp_elem_idx, exp_idx] + exp_cy[exp_elem_idx, exp_idx_neg] * sign) * base_cy[base_elem_idx, base_idx]
+                    sign = - sign
 
     return out
 
