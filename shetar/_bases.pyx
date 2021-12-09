@@ -45,9 +45,9 @@ def associated_legendre_polynomials(x, order=None, out=None):
         order = int((8 * num_unique + 1)**0.5 - 3) // 2
     if out is None:
         num_unique = (order + 1) * (order + 2) // 2
-        out = np.zeros((num_unique,) + output_shape)
+        out = np.zeros(output_shape + (num_unique,))
 
-    out[0] = 1 / 2**0.5
+    out[..., 0] = 1 / 2**0.5
 
     cdef:
         int idx_elem, n, m, idx_assign, idx_m1, idx_m2
@@ -55,36 +55,43 @@ def associated_legendre_polynomials(x, order=None, out=None):
         double fact_m1, fact_m2
         double[:] x_cy = x.reshape(-1)
         double[:] one_minus_x_square = 1 - x.reshape(-1)**2
-        double[:, :] data = out.reshape((num_unique, -1))
+        double[:, :] data = out.reshape((-1, num_unique))
 
-    with cython.boundscheck(False), cython.cdivision(True), nogil:
-        for n in range(1, N + 1):
-            # Recurrence to higher orders
-            idx_assign = associated_legendre_index(n, n)
-            idx_m1 = associated_legendre_index(n - 1, n - 1)
-            fact_m1 = - (<double>(2 * n + 1) / (2 * n))**0.5
-            for idx_elem in range(num_elements):
-                data[idx_assign, idx_elem] = fact_m1 * data[idx_m1, idx_elem]
+    with cython.boundscheck(False), cython.cdivision(True), cython.wraparound(False), nogil:
+        for idx_elem in prange(num_elements):
+            for n in range(1, N + 1):
+                # Recurrence to higher orders
+                idx_assign = associated_legendre_index(n, n)
+                idx_m1 = associated_legendre_index(n - 1, n - 1)
+                fact_m1 = - (<double>(2 * n + 1) / (2 * n))**0.5        
+                data[idx_elem, idx_assign] = fact_m1 * data[idx_elem, idx_m1]
 
-            # Same recurrence as below, but excluding the mode+2 part explicitly.
-            idx_assign = associated_legendre_index(n, n - 1)
-            idx_m1 = associated_legendre_index(n, n)
-            fact_m1 = - (2 * n)**0.5
-            for idx_elem in range(num_elements):
-                data[idx_assign, idx_elem] = fact_m1 * data[idx_m1, idx_elem] * x_cy[idx_elem]
+            for n in range(1, N + 1):
+                # Recurrence to lower modes for each order.
+                # This is separated to a new loop since we modify the values in place as we go.
 
-            for m in range(n - 2, -1, -1):  # [n - 2, n - 3, ... 0]
-                # Recurrece to lower modes
-                idx_assign = associated_legendre_index(n, m)
-                idx_m1 = associated_legendre_index(n, m + 1)
-                idx_m2 = associated_legendre_index(n, m + 2)
-                fact_m1 = - 2 * <double>(m + 1) / ((n + m + 1) * (n - m)) ** 0.5
-                fact_m2 = -(<double>((n + m + 2) * (n - m - 1)) / ((n - m) * (n + m + 1))) ** 0.5
-                for idx_elem in range(num_elements):
-                    data[idx_assign, idx_elem] = (
-                        fact_m1 * data[idx_m1, idx_elem] * x_cy[idx_elem]
-                        + fact_m2 * data[idx_m2, idx_elem] * one_minus_x_square[idx_elem]
-                    ) 
+                # Same recurrence as below, but excluding the mode+2 part explicitly.
+                idx_assign = associated_legendre_index(n, n - 1)
+                idx_m1 = associated_legendre_index(n, n)
+                fact_m1 = - (2 * n)**0.5
+                data[idx_elem, idx_assign] = fact_m1 * data[idx_elem, idx_m1] * x_cy[idx_elem]
+
+                for m in range(n - 2, -1, -1):  # [n - 2, n - 3, ... 0]
+                    # Recurrece to lower modes
+                    idx_assign = associated_legendre_index(n, m)
+                    idx_m1 = associated_legendre_index(n, m + 1)
+                    idx_m2 = associated_legendre_index(n, m + 2)
+                    fact_m1 = - 2 * <double>(m + 1) / ((n + m + 1) * (n - m)) ** 0.5
+                    fact_m2 = -(<double>((n + m + 2) * (n - m - 1)) / ((n - m) * (n + m + 1))) ** 0.5
+                    data[idx_elem, idx_assign] = (
+                        fact_m1 * data[idx_elem, idx_m1] * x_cy[idx_elem]
+                        + fact_m2 * data[idx_elem, idx_m2] * one_minus_x_square[idx_elem]
+                    )
+                    # Modify the (n, m+2) components to have the correct normalization.
+                    # This cannot be done earlier since the recurrence is not stable if this scale is included!
+                    data[idx_elem, idx_m2] *= one_minus_x_square[idx_elem] ** (0.5 * m + 1)
+                # Normalization for (n, 1) components. (n, 0) needs no modification.
+                data[idx_elem, idx_m1] *= one_minus_x_square[idx_elem] ** 0.5
 
     return out
 
