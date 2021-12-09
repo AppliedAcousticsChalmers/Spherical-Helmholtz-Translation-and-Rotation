@@ -1,5 +1,8 @@
 import numpy as np
 cimport cython
+from cython.parallel import prange
+from ._shapes import prepare_strides, broadcast_shapes
+from ._shapes cimport broadcast_index
 
 
 def legendre_polynomials(x, order=None, out=None):
@@ -8,26 +11,26 @@ def legendre_polynomials(x, order=None, out=None):
     output_shape = np.shape(x)
 
     if order is None:
-        order = out.shape[0] - 1
+        order = out.shape[-1] - 1
     if out is None:
-        out = np.zeros((order + 1,) + output_shape)
+        out = np.zeros(output_shape + (order + 1,))
 
-    out[0] = 1 / 2**0.5
+    out[..., 0] = 1 / 2**0.5
     if order >= 1:
-        out[1] = x * 1.5**0.5
+        out[..., 1] = x * 1.5**0.5
 
     cdef:
         int idx, n, N = order, num_elements = np.size(x)
         double n_minus_1_factor, n_minus_2_factor
         double[:] x_cy = x.reshape(-1)
-        double[:, :] data = out.reshape((order + 1, np.size(x)))
+        double[:, :] data = out.reshape((np.size(x), order + 1))
 
-    with cython.boundscheck(False), cython.cdivision(True), nogil:
-        for n in range(2, N + 1):
-            n_minus_1_factor = ((2 * n + 1) * (2 * n - 1))**0.5 / n
-            n_minus_2_factor = <double>(n - 1) / n * (<double>(2 * n + 1) / (2 * n - 3))**0.5
-            for idx in range(num_elements):
-                data[n, idx] = x_cy[idx] * data[n - 1, idx] * n_minus_1_factor - data[n - 2, idx] * n_minus_2_factor
+    with cython.boundscheck(False), cython.cdivision(True), cython.wraparound(False), nogil:
+        for idx in prange(num_elements):
+            for n in range(2, N + 1):
+                n_minus_1_factor = ((2 * n + 1) * (2 * n - 1))**0.5 / n
+                n_minus_2_factor = <double>(n - 1) / n * (<double>(2 * n + 1) / (2 * n - 3))**0.5
+                data[idx, n] = x_cy[idx] * data[idx, n - 1] * n_minus_1_factor - data[idx, n - 2] * n_minus_2_factor
 
     return out
 
