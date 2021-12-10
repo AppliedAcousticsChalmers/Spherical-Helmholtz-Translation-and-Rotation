@@ -289,6 +289,99 @@ def spherical_harmonics_contraction(expansion_data, legendre_data, phase_data, o
     return out
 
 
+def multipole_contraction(expansion_data, radial_data, legendre_data, phase_data, out=None):
+    output_shape, expansion_shape, radial_shape, legendre_shape, phase_shape = broadcast_shapes(
+        expansion_data.shape[:-1], radial_data.shape[:-1], legendre_data.shape[:-1], phase_data.shape
+    )
+
+    base_order = int((8 * legendre_data.shape[-1] + 1)**0.5 - 3) // 2
+    expansion_order = int(expansion_data.shape[-1] ** 0.5) - 1
+    radial_order = int(radial_data.shape[-1])
+    output_order = min(base_order, expansion_order, radial_order)
+
+    if out is None:
+        out = np.zeros(output_shape, complex)
+    elif out.shape != output_shape:
+        raise ValueError(f'Cannot use array of shape {out.shape} as output array for contraction between expansion with shape {expansion_shape}, radial basis with shape {radial_shape}, legendre bases with shape {legendre_shape}, and azimuth phases with shape {phase_shape}')
+
+    if not np.iscomplexobj(expansion_data):
+        expansion_data = expansion_data + 0j
+
+    if not np.iscomplexobj(radial_data):
+        radial_data = radial_data + 0j
+
+    cdef:
+        double complex[:, :] exp_cy = expansion_data.reshape((-1, expansion_data.shape[-1]))
+        double[:, :] legendre_cy = legendre_data.reshape((-1, legendre_data.shape[-1]))
+        double complex[:, :] radial_cy = radial_data.reshape((-1, radial_data.shape[-1]))
+        double complex[:] phase_cy = phase_data.reshape(-1)
+        double complex[:] out_cy = out.reshape(-1)
+        double complex phase_power, positive_partial, negative_partial
+        Py_ssize_t n, m, exp_idx, exp_idx_neg, legendre_idx, N = output_order
+        int sign
+
+    if out.ndim == 0:
+        with cython.boundscheck(False), cython.cdivision(True), cython.wraparound(False), nogil:
+            for n in range(N + 1):
+                exp_idx = spherical_expansion_index(n, 0)
+                legendre_idx = associated_legendre_index(n, 0)
+                out_cy[0] = out_cy[0] + exp_cy[0, exp_idx] * legendre_cy[0, legendre_idx] * radial_cy[0, n]
+
+            sign = -1
+            for m in range(1, N + 1):
+                phase_power = phase_cy[0] ** m
+                positive_partial = 0.
+                negative_partial = 0.
+                for n in range(m, N + 1):
+                    exp_idx = spherical_expansion_index(n, m)
+                    exp_idx_neg = spherical_expansion_index(n, -m)
+                    legendre_idx = associated_legendre_index(n, m)
+                    positive_partial = positive_partial + legendre_cy[0, legendre_idx] * exp_cy[0, exp_idx] * radial_cy[0, n]
+                    negative_partial = negative_partial + legendre_cy[0, legendre_idx] * exp_cy[0, exp_idx_neg] * radial_cy[0, n]
+                out_cy[0] = out_cy[0] + positive_partial * phase_power + sign * negative_partial * phase_power.conjugate()
+                sign = -sign
+        out /= (2 * np.pi)**0.5
+        return out
+
+    cdef:
+        Py_ssize_t[:] exp_stride = prepare_strides(expansion_shape, output_shape)
+        Py_ssize_t[:] legendre_stride = prepare_strides(legendre_shape, output_shape)
+        Py_ssize_t[:] phase_stride = prepare_strides(phase_shape, output_shape)
+        Py_ssize_t[:] radial_stride = prepare_strides(radial_shape, output_shape)
+        Py_ssize_t[:] out_stride = prepare_strides(output_shape, output_shape)
+        Py_ssize_t exp_elem_idx, legendre_elem_idx, phase_elem_idx, radial_elem_idx, out_elem_idx
+        Py_ssize_t num_elements = out.size, ndim = out.ndim
+
+    with cython.boundscheck(False), cython.cdivision(True), cython.wraparound(False), nogil:
+        for out_elem_idx in prange(num_elements):
+            exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
+            legendre_elem_idx = broadcast_index(out_elem_idx, legendre_stride, out_stride, ndim)
+            phase_elem_idx = broadcast_index(out_elem_idx, phase_stride, out_stride, ndim)
+            radial_elem_idx = broadcast_index(out_elem_idx, radial_stride, out_stride, ndim)
+
+            for n in range(N + 1):
+                exp_idx = spherical_expansion_index(n, 0)
+                legendre_idx = associated_legendre_index(n, 0)
+                out_cy[out_elem_idx] = out_cy[out_elem_idx] + exp_cy[exp_elem_idx, exp_idx] * legendre_cy[legendre_elem_idx, legendre_idx] * radial_cy[radial_elem_idx, n]
+
+            sign = -1
+            for m in range(1, N + 1):
+                phase_power = phase_cy[phase_elem_idx] ** m
+                positive_partial = 0.
+                negative_partial = 0.
+                for n in range(m, N + 1):
+                    exp_idx = spherical_expansion_index(n, m)
+                    exp_idx_neg = spherical_expansion_index(n, -m)
+                    legendre_idx = associated_legendre_index(n, m)
+                    positive_partial = positive_partial + legendre_cy[legendre_elem_idx, legendre_idx] * exp_cy[exp_elem_idx, exp_idx] * radial_cy[radial_elem_idx, n]
+                    negative_partial = negative_partial + legendre_cy[legendre_elem_idx, legendre_idx] * exp_cy[exp_elem_idx, exp_idx_neg] * radial_cy[radial_elem_idx, n]
+                out_cy[out_elem_idx] = out_cy[out_elem_idx] + positive_partial * phase_power + sign * negative_partial * phase_power.conjugate()
+                sign = -sign
+
+    out /= (2 * np.pi)**0.5
+    return out
+
+
 @cython.boundscheck(False)
 @cython.cdivision(True)
 cdef int associated_legendre_index(int order, int mode) nogil:
