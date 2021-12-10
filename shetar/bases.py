@@ -180,7 +180,7 @@ class SphericalHarmonics(coordinates.OwnerMixin):
         return new_obj
 
 
-class SphericalBase(coordinates.OwnerMixin):
+class MultipoleBase(coordinates.OwnerMixin):
     _contract = staticmethod(_bases.multipole_contraction)
 
     def __init__(self, order, position=None, wavenumber=None,
@@ -229,15 +229,15 @@ class SphericalBase(coordinates.OwnerMixin):
         return self._contract(expansion_data, radial_data, legendre_data, phase_data)
 
 
-class RegularBase(SphericalBase):
+class RegularBase(MultipoleBase):
     _radial_cls = RegularRadialBase
 
 
-class SingularBase(SphericalBase):
+class SingularBase(MultipoleBase):
     _radial_cls = SingularRadialBase
 
 
-class DualBase(SphericalBase):
+class DualBase(MultipoleBase):
     _radial_cls = DualRadialBase
 
     class _Regular:
