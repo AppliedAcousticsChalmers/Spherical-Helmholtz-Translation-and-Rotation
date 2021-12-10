@@ -384,5 +384,11 @@ def multipole_contraction(expansion_data, radial_data, legendre_data, phase_data
 
 @cython.boundscheck(False)
 @cython.cdivision(True)
-cdef int associated_legendre_index(int order, int mode) nogil:
+cdef inline int associated_legendre_index(int order, int mode) nogil:
     return (order * (order + 1)) / 2 + mode
+
+
+@cython.boundscheck(False)
+@cython.cdivision(True)
+cdef inline int spherical_expansion_index(int order, int mode) nogil:
+    return order ** 2 + order + mode
