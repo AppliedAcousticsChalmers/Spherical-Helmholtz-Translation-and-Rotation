@@ -85,7 +85,7 @@ def associated_legendre_polynomials(x, order=None, out=None):
     output_shape = np.shape(x)
 
     if order is None:
-        num_unique = out.shape[0]
+        num_unique = out.shape[-1]
         order = int((8 * num_unique + 1)**0.5 - 3) // 2
     if out is None:
         num_unique = (order + 1) * (order + 2) // 2

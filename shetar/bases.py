@@ -48,23 +48,30 @@ class LegendrePolynomials(coordinates.OwnerMixin):
     def evaluate(self, position=None, colatitude=None, x=None):
         if x is not None:
             self.coordinate = coordinates.NonspatialCoordinate(x=x)
-            arg = self.coordinate.x
         else:
             self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
+
+        if isinstance(self.coordinate, coordinates.NonspatialCoordinate):
+            arg = self.coordinate.x
+        elif isinstance(self.coordinate, coordinates.SpatialCoordinate):
             arg = np.cos(self.coordinate.colatitude)
+        else:
+            raise TypeError(f'Unknown type of coordinate {type(self.coordinate)}')
 
         self._calculate(arg, out=self._data)
         return self
 
     def apply(self, expansion):
-        expansion_data = expansion._data
+        try:
+            expansion_data = expansion._data
+        except AttributeError:
+            expansion_data = np.asarray(expansion)
         return self._contract(expansion_data, self._data)
 
 
 class AssociatedLegendrePolynomials(LegendrePolynomials):
     _calculate = staticmethod(_bases.associated_legendre_polynomials)
     _contract = staticmethod(_bases.associated_legendre_contraction)
-
 
     @classmethod
     def num_unique_to_order(cls, num_unique):
@@ -93,8 +100,8 @@ class RadialBaseClass(coordinates.OwnerMixin):
         else:
             x = self.coordinate.radius * np.reshape(self.wavenumber, np.shape(self.wavenumber) + (1,) * self.ndim)
 
-        order = np.arange(self.order + 1).reshape((1,) * (np.ndim(self.wavenumber) + self.ndim) + (-1,))
-        self._data = self._radial_func(order, x)
+        order = np.arange(self.order + 1)
+        self._data = self._radial_func(order, x[..., None])
         return self
 
     @property
@@ -157,7 +164,10 @@ class SphericalHarmonics(coordinates.OwnerMixin):
         return self
 
     def apply(self, expansion):
-        expansion_data = expansion._data
+        try:
+            expansion_data = expansion._data
+        except AttributeError:
+            expansion_data = np.asarray(expansion)
         legendre_data = self._legendre._data
         phase_data = self._phase
         return self._contract(expansion_data, legendre_data, phase_data)
@@ -213,6 +223,11 @@ class MultipoleBase(coordinates.OwnerMixin):
         return self._radial.wavenumber
 
     def apply(self, expansion):
+        try:
+            expansion_data = expansion._data
+        except AttributeError:
+            expansion_data = np.asarray(expansion)
+        
         wavenumber = getattr(expansion, 'wavenumber', None)
         if wavenumber is not None:
             if not np.allclose(wavenumber, self.wavenumber):
@@ -222,7 +237,6 @@ class MultipoleBase(coordinates.OwnerMixin):
             # TODO: test if this could break things
             wavenumber = self.wavenumber
 
-        expansion_data = expansion._data
         legendre_data = self._angular._legendre._data
         phase_data = self._angular._phase
         radial_data = self._radial._data
