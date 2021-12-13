@@ -72,7 +72,7 @@ class LegendrePolynomials(coordinates.OwnerMixin):
         else:
             raise TypeError(f'Unknown type of coordinate {type(self.coordinate)}')
 
-        self._calculate(arg, out=self._data)
+        self._calculate(arg, order=self.order, out=self._data)
         return self
 
     def apply(self, expansion):

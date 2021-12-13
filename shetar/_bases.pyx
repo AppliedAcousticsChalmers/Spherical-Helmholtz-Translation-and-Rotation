@@ -12,8 +12,14 @@ def legendre_polynomials(x, order=None, out=None):
 
     if order is None:
         order = out.shape[-1] - 1
+    num_unique = order + 1
     if out is None:
-        out = np.zeros(output_shape + (order + 1,))
+        out = np.zeros(output_shape + (num_unique,))
+    else:
+        if out.shape[:-1] != output_shape:
+            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for legendre polynomials with argument shape {output_shape}')
+        if out.shape[-1] != num_unique:
+            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for legendre polynomials of order {order}, requiring {num_unique} unique values')
 
     out[..., 0] = 1 / 2**0.5
     if order >= 1:
@@ -23,7 +29,7 @@ def legendre_polynomials(x, order=None, out=None):
         int idx, n, N = order, num_elements = np.size(x)
         double n_minus_1_factor, n_minus_2_factor
         double[:] x_cy = x.reshape(-1)
-        double[:, :] data = out.reshape((np.size(x), order + 1))
+        double[:, :] data = out.reshape((np.size(x), num_unique))
 
     with cython.boundscheck(False), cython.cdivision(True), cython.wraparound(False), nogil:
         for idx in prange(num_elements):
@@ -85,11 +91,15 @@ def associated_legendre_polynomials(x, order=None, out=None):
     output_shape = np.shape(x)
 
     if order is None:
-        num_unique = out.shape[-1]
-        order = int((8 * num_unique + 1)**0.5 - 3) // 2
+        order = int((8 * out.shape[-1] + 1)**0.5 - 3) // 2
+    num_unique = (order + 1) * (order + 2) // 2
     if out is None:
-        num_unique = (order + 1) * (order + 2) // 2
         out = np.zeros(output_shape + (num_unique,))
+    else:
+        if out.shape[:-1] != output_shape:
+            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for associated legendre polynomials with argument shape {output_shape}')
+        if out.shape[-1] != num_unique:
+            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for associated legendre polynomials of order {order}, requiring {num_unique} unique values')
 
     out[..., 0] = 1 / 2**0.5
 
