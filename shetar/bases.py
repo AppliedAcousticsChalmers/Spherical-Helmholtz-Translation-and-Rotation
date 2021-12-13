@@ -79,7 +79,7 @@ class AssociatedLegendrePolynomials(LegendrePolynomials):
 
     @classmethod
     def num_unique_to_order(cls, num_unique):
-        int((8 * num_unique + 1)**0.5 - 3) // 2
+        return int((8 * num_unique + 1)**0.5 - 3) // 2
 
     @classmethod
     def num_unique(cls, order):
@@ -90,6 +90,8 @@ class AssociatedLegendrePolynomials(LegendrePolynomials):
             n, m = key
             n, m = np.broadcast_arrays(n, m)
             indices = np.stack([n, m], axis=1)
+        except np.AxisError:
+            return self._indexing(self._data, [[n, m]])[..., 0]
         except ValueError:
             indices = np.asarray(key)
         if indices.ndim != 2:
