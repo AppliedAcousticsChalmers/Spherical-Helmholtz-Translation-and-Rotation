@@ -5,6 +5,45 @@ from ._shapes import prepare_strides, broadcast_shapes
 from ._shapes cimport broadcast_index
 
 
+@cython.boundscheck(False)
+@cython.cdivision(True)
+cdef inline int associated_legendre_index(int order, int mode) nogil:
+    return (order * (order + 1)) / 2 + mode
+
+
+@cython.boundscheck(False)
+cdef inline int spherical_expansion_index(int order, int mode) nogil:
+    return order ** 2 + order + mode
+
+
+def associated_legendre_indexing(base_data, indices):
+    indices = np.asarray(indices).astype(int)
+    out = np.zeros(base_data.shape[:-1] + (indices.shape[0],), float)
+    
+    for out_idx, (n, m) in enumerate(indices):
+        base_idx = associated_legendre_index(n, abs(m))
+        if m < 0:
+            out[..., out_idx] = base_data[..., base_idx] * (-1) ** abs(m)
+        else:
+            out[..., out_idx] = base_data[..., base_idx]
+    return out
+
+
+def spherical_harmonics_indexing(legendre_data, phase_data, indices):
+    indices = np.asarray(indices).astype(int)
+    legendre_indexed = associated_legendre_indexing(legendre_data, indices)
+
+    out = legendre_indexed * phase_data[..., None] ** indices[:, 1] / (2 * np.pi)**0.5
+    return out
+
+
+def multipole_indexing(radial_data, legendre_data, phase_data, indices):
+    indices = np.asarray(indices).astype(int)
+    spherical_harmonics_indexed = spherical_harmonics_indexing(legendre_data, phase_data, indices)
+    out = spherical_harmonics_indexed * radial_data[..., indices[:, 0]]
+    return out
+
+
 def legendre_polynomials(x, order=None, out=None):
     if order is None and out is None:
         raise ValueError('Cannot calculate Legendre polynomials without receiving either the output array or the order')
@@ -37,50 +76,6 @@ def legendre_polynomials(x, order=None, out=None):
                 n_minus_1_factor = ((2 * n + 1) * (2 * n - 1))**0.5 / n
                 n_minus_2_factor = <double>(n - 1) / n * (<double>(2 * n + 1) / (2 * n - 3))**0.5
                 data[idx, n] = x_cy[idx] * data[idx, n - 1] * n_minus_1_factor - data[idx, n - 2] * n_minus_2_factor
-
-    return out
-
-
-def legendre_contraction(expansion_data, base_data, out=None):
-    output_shape, expansion_shape, base_shape = broadcast_shapes(
-        expansion_data.shape[:-1], base_data.shape[:-1]
-    )
-
-    expansion_order = expansion_data.shape[-1]
-    base_order = base_data.shape[-1]
-    output_order = min(expansion_order, base_order)
-
-    if out is None:
-        out = np.zeros(output_shape)
-    elif out.shape != output_shape:
-        raise ValueError(f'Cannot use array of shape {out.shape} as output array for contraction between expansion with shape {expansion_shape} and bases with shape {base_shape}')
-
-    cdef:
-        double[:, :] exp_cy = expansion_data.reshape((-1, expansion_order))
-        double[:, :] base_cy = base_data.reshape((-1, base_order))
-        double[:] out_cy = out.reshape(-1)
-        Py_ssize_t n, N = output_order
-
-    if out.ndim == 0:
-        # No loop over elements.
-        with cython.boundscheck(False), nogil:
-            for n in range(N):
-                out_cy[0] += exp_cy[0, n] * base_cy[0, n]
-        return out
-
-    cdef:
-        Py_ssize_t[:] exp_stride = prepare_strides(expansion_shape, output_shape)
-        Py_ssize_t[:] base_stride = prepare_strides(base_shape, output_shape)
-        Py_ssize_t[:] out_stride = prepare_strides(output_shape, output_shape)
-        Py_ssize_t exp_idx, base_idx, out_idx
-        Py_ssize_t num_elements = out.size, ndim = out.ndim
-    
-    with cython.boundscheck(False), cython.wraparound(False), cython.cdivision(True), nogil:
-        for out_idx in prange(num_elements):
-            exp_idx = broadcast_index(out_idx, exp_stride, out_stride, ndim)
-            base_idx = broadcast_index(out_idx, base_stride, out_stride, ndim)
-            for n in range(N):
-                out_cy[out_idx] += exp_cy[exp_idx, n] * base_cy[base_idx, n]
 
     return out
 
@@ -149,6 +144,50 @@ def associated_legendre_polynomials(x, order=None, out=None):
     return out
 
 
+def legendre_contraction(expansion_data, base_data, out=None):
+    output_shape, expansion_shape, base_shape = broadcast_shapes(
+        expansion_data.shape[:-1], base_data.shape[:-1]
+    )
+
+    expansion_order = expansion_data.shape[-1]
+    base_order = base_data.shape[-1]
+    output_order = min(expansion_order, base_order)
+
+    if out is None:
+        out = np.zeros(output_shape)
+    elif out.shape != output_shape:
+        raise ValueError(f'Cannot use array of shape {out.shape} as output array for contraction between expansion with shape {expansion_shape} and bases with shape {base_shape}')
+
+    cdef:
+        double[:, :] exp_cy = expansion_data.reshape((-1, expansion_order))
+        double[:, :] base_cy = base_data.reshape((-1, base_order))
+        double[:] out_cy = out.reshape(-1)
+        Py_ssize_t n, N = output_order
+
+    if out.ndim == 0:
+        # No loop over elements.
+        with cython.boundscheck(False), nogil:
+            for n in range(N):
+                out_cy[0] += exp_cy[0, n] * base_cy[0, n]
+        return out
+
+    cdef:
+        Py_ssize_t[:] exp_stride = prepare_strides(expansion_shape, output_shape)
+        Py_ssize_t[:] base_stride = prepare_strides(base_shape, output_shape)
+        Py_ssize_t[:] out_stride = prepare_strides(output_shape, output_shape)
+        Py_ssize_t exp_idx, base_idx, out_idx
+        Py_ssize_t num_elements = out.size, ndim = out.ndim
+    
+    with cython.boundscheck(False), cython.wraparound(False), cython.cdivision(True), nogil:
+        for out_idx in prange(num_elements):
+            exp_idx = broadcast_index(out_idx, exp_stride, out_stride, ndim)
+            base_idx = broadcast_index(out_idx, base_stride, out_stride, ndim)
+            for n in range(N):
+                out_cy[out_idx] += exp_cy[exp_idx, n] * base_cy[base_idx, n]
+
+    return out
+
+
 def associated_legendre_contraction(expansion_data, base_data, out=None):
     output_shape, expansion_shape, base_shape = broadcast_shapes(
         expansion_data.shape[:-1], base_data.shape[:-1]
@@ -211,19 +250,6 @@ def associated_legendre_contraction(expansion_data, base_data, out=None):
                     base_idx = associated_legendre_index(n, m)
                     out_cy[out_elem_idx] += (exp_cy[exp_elem_idx, exp_idx] + exp_cy[exp_elem_idx, exp_idx_neg] * sign) * base_cy[base_elem_idx, base_idx]
                     sign = - sign
-    return out
-
-
-def associated_legendre_indexing(base_data, indices):
-    indices = np.asarray(indices).astype(int)
-    out = np.zeros(base_data.shape[:-1] + (indices.shape[0],), float)
-    
-    for out_idx, (n, m) in enumerate(indices):
-        base_idx = associated_legendre_index(n, abs(m))
-        if m < 0:
-            out[..., out_idx] = base_data[..., base_idx] * (-1) ** abs(m)
-        else:
-            out[..., out_idx] = base_data[..., base_idx]
     return out
 
 
@@ -309,14 +335,6 @@ def spherical_harmonics_contraction(expansion_data, legendre_data, phase_data, o
                 sign = -sign
 
     out /= (2 * np.pi)**0.5
-    return out
-
-
-def spherical_harmonics_indexing(legendre_data, phase_data, indices):
-    indices = np.asarray(indices).astype(int)
-    legendre_indexed = associated_legendre_indexing(legendre_data, indices)
-
-    out = legendre_indexed * phase_data[..., None] ** indices[:, 1] / (2 * np.pi)**0.5
     return out
 
 
@@ -411,22 +429,3 @@ def multipole_contraction(expansion_data, radial_data, legendre_data, phase_data
 
     out /= (2 * np.pi)**0.5
     return out
-
-
-def multipole_indexing(radial_data, legendre_data, phase_data, indices):
-    indices = np.asarray(indices).astype(int)
-    spherical_harmonics_indexed = spherical_harmonics_indexing(legendre_data, phase_data, indices)
-    out = spherical_harmonics_indexed * radial_data[..., indices[:, 0]]
-    return out
-
-
-@cython.boundscheck(False)
-@cython.cdivision(True)
-cdef inline int associated_legendre_index(int order, int mode) nogil:
-    return (order * (order + 1)) / 2 + mode
-
-
-@cython.boundscheck(False)
-@cython.cdivision(True)
-cdef inline int spherical_expansion_index(int order, int mode) nogil:
-    return order ** 2 + order + mode
