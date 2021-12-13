@@ -403,6 +403,13 @@ def multipole_contraction(expansion_data, radial_data, legendre_data, phase_data
     return out
 
 
+def multipole_indexing(radial_data, legendre_data, phase_data, indices):
+    indices = np.asarray(indices).astype(int)
+    spherical_harmonics_indexed = spherical_harmonics_indexing(legendre_data, phase_data, indices)
+    out = spherical_harmonics_indexed * radial_data[..., indices[:, 0]]
+    return out
+
+
 @cython.boundscheck(False)
 @cython.cdivision(True)
 cdef inline int associated_legendre_index(int order, int mode) nogil:

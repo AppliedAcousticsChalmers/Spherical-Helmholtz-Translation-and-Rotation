@@ -268,6 +268,8 @@ class MultipoleBase(coordinates.OwnerMixin):
         radial_data = self._radial._data
         return self._contract(expansion_data, radial_data, legendre_data, phase_data)
 
+    def __getitem__(self, key):
+        return _wrap_indexing(key, _bases.multipole_indexing, self._radial._data, self._angular._legendre._data, self._angular._phase)
 
 class RegularBase(MultipoleBase):
     _radial_cls = RegularRadialBase
