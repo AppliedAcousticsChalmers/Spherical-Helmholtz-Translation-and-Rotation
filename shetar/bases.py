@@ -4,6 +4,20 @@ from . import coordinates
 from . import _bases
 
 
+def _wrap_indexing(key, func, *args):
+    try:
+        n, m = key
+        n, m = np.broadcast_arrays(n, m)
+        indices = np.stack([n, m], axis=1)
+    except np.AxisError:
+        return func(*args, [[n, m]])[..., 0]
+    except ValueError:
+        indices = np.asarray(key)
+    if indices.ndim != 2:
+        raise ValueError('Cannot index with multidimentional arrays')
+    return func(*args, indices)
+
+
 class LegendrePolynomials(coordinates.OwnerMixin):
     _calculate = staticmethod(_bases.legendre_polynomials)
     _contract = staticmethod(_bases.legendre_contraction)
@@ -75,7 +89,6 @@ class LegendrePolynomials(coordinates.OwnerMixin):
 class AssociatedLegendrePolynomials(LegendrePolynomials):
     _calculate = staticmethod(_bases.associated_legendre_polynomials)
     _contract = staticmethod(_bases.associated_legendre_contraction)
-    _indexing = staticmethod(_bases.associated_legendre_indexing)
 
     @classmethod
     def num_unique_to_order(cls, num_unique):
@@ -86,17 +99,7 @@ class AssociatedLegendrePolynomials(LegendrePolynomials):
         return (order + 1) * (order + 2) // 2
 
     def __getitem__(self, key):
-        try:
-            n, m = key
-            n, m = np.broadcast_arrays(n, m)
-            indices = np.stack([n, m], axis=1)
-        except np.AxisError:
-            return self._indexing(self._data, [[n, m]])[..., 0]
-        except ValueError:
-            indices = np.asarray(key)
-        if indices.ndim != 2:
-            raise ValueError('Cannot index AssociatedLegendrePolynomials with multidimentional arrays')
-        return self._indexing(self._data, indices)
+        return _wrap_indexing(key, _bases.associated_legendre_indexing, self._data)
 
 
 class RadialBaseClass(coordinates.OwnerMixin):
@@ -166,7 +169,6 @@ class DualRadialBase(RadialBaseClass):
 
 class SphericalHarmonics(coordinates.OwnerMixin):
     _contract = staticmethod(_bases.spherical_harmonics_contraction)
-    _indexing = staticmethod(_bases.spherical_harmonics_indexing)
 
     def __init__(self, order, position=None, colatitude=None, azimuth=None, defer_evaluation=False, *args, **kwargs):
         self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude, azimuth=azimuth)
@@ -211,19 +213,7 @@ class SphericalHarmonics(coordinates.OwnerMixin):
         return new_obj
 
     def __getitem__(self, key):
-        legendre_data = self._legendre._data
-        phase_data = self._phase
-        try:
-            n, m = key
-            n, m = np.broadcast_arrays(n, m)
-            indices = np.stack([n, m], axis=1)
-        except np.AxisError:
-            return self._indexing(legendre_data, phase_data, [[n, m]])[..., 0]
-        except ValueError:
-            indices = np.asarray(key)
-        if indices.ndim != 2:
-            raise ValueError('Cannot index AssociatedLegendrePolynomials with multidimentional arrays')
-        return self._indexing(legendre_data, phase_data, indices)
+        return _wrap_indexing(key, _bases.spherical_harmonics_indexing, self._legendre._data, self._phase)
 
 
 class MultipoleBase(coordinates.OwnerMixin):
