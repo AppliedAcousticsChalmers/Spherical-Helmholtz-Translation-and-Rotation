@@ -143,6 +143,9 @@ class RadialBaseClass(coordinates.OwnerMixin):
     def wavenumber(self):
         return self._wavenumber
 
+    def __getitem__(self, key):
+        return self._data[..., key]
+
 
 class RegularRadialBase(RadialBaseClass):
     def _radial_func(self, order, x):
@@ -163,6 +166,7 @@ class DualRadialBase(RadialBaseClass):
 
 class SphericalHarmonics(coordinates.OwnerMixin):
     _contract = staticmethod(_bases.spherical_harmonics_contraction)
+    _indexing = staticmethod(_bases.spherical_harmonics_indexing)
 
     def __init__(self, order, position=None, colatitude=None, azimuth=None, defer_evaluation=False, *args, **kwargs):
         self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude, azimuth=azimuth)
@@ -205,6 +209,21 @@ class SphericalHarmonics(coordinates.OwnerMixin):
         else:
             new_obj._phase = self._phase
         return new_obj
+
+    def __getitem__(self, key):
+        legendre_data = self._legendre._data
+        phase_data = self._phase
+        try:
+            n, m = key
+            n, m = np.broadcast_arrays(n, m)
+            indices = np.stack([n, m], axis=1)
+        except np.AxisError:
+            return self._indexing(legendre_data, phase_data, [[n, m]])[..., 0]
+        except ValueError:
+            indices = np.asarray(key)
+        if indices.ndim != 2:
+            raise ValueError('Cannot index AssociatedLegendrePolynomials with multidimentional arrays')
+        return self._indexing(legendre_data, phase_data, indices)
 
 
 class MultipoleBase(coordinates.OwnerMixin):

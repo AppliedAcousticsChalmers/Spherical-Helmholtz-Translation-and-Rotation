@@ -302,6 +302,14 @@ def spherical_harmonics_contraction(expansion_data, legendre_data, phase_data, o
     return out
 
 
+def spherical_harmonics_indexing(legendre_data, phase_data, indices):
+    indices = np.asarray(indices).astype(int)
+    legendre_indexed = associated_legendre_indexing(legendre_data, indices)
+
+    out = legendre_indexed * phase_data[..., None] ** indices[:, 1] / (2 * np.pi)**0.5
+    return out
+
+
 def multipole_contraction(expansion_data, radial_data, legendre_data, phase_data, out=None):
     output_shape, expansion_shape, radial_shape, legendre_shape, phase_shape = broadcast_shapes(
         expansion_data.shape[:-1], radial_data.shape[:-1], legendre_data.shape[:-1], phase_data.shape

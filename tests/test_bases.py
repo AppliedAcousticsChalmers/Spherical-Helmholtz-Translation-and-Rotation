@@ -75,19 +75,27 @@ def test_legendre_values(order, cosine_colatitude):
     for idx, (n, m) in enumerate(indices):
         np.testing.assert_allclose(implemented_values[..., idx], associated_legendre[n, m], err_msg=f'Indexing AssociatedLegendrePolynomials with vector of single value gives different reslts at {(n, m) = }')
 
-def test_spherical_harmoics_values(order, colatitude, azimuth):
+
+def test_spherical_harmonics_values(order, colatitude, azimuth):
     try:
         colatitude, azimuth = np.broadcast_arrays(colatitude, azimuth)
     except ValueError:
         colatitude = colatitude.reshape(colatitude.shape + (1,) * np.ndim(azimuth))
     sh = shetar.bases.SphericalHarmonics(order=order, colatitude=colatitude, azimuth=azimuth)
-    for n in range(order + 1):
-        for m in range(-n, n + 1):
-            np.testing.assert_allclose(
-                scipy.special.sph_harm(m, n, azimuth, colatitude), sh[n, m],
-                err_msg=f'Spherical harmonics output failed at (n, m) = {(n, m)}',
-                atol=10 * np.finfo(float).eps  # Since the scipy implementation has more floating point errors internally.
-            )
+
+    indices = np.asarray([(n, m) for n in range(order + 1) for m in range(-n, n + 1)])
+    n, m = indices.T
+    scipy_value = scipy.special.sph_harm(m, n, azimuth[..., None], colatitude[..., None])
+    implemented_values = sh[n, m]
+    np.testing.assert_allclose(
+        scipy_value, implemented_values,
+        err_msg=f'Implemented SphericalHarmonics differs from scipy implemented values at {order = }',
+        atol=10 * np.finfo(float).eps  # Since the scipy implementation has more floating point errors internally.
+    )
+    np.testing.assert_allclose(implemented_values, sh[indices], err_msg=f'Indexing SphericalHarmonics with [n, m] or [index] gives different results at {order = }')
+ 
+    for idx, (n, m) in enumerate(indices):
+        np.testing.assert_allclose(implemented_values[..., idx], sh[n, m], err_msg=f'Indexing SphericalHarmonics with vector of single value gives different reslts at {(n, m) = }')
 
 
 def test_regular_base_values(order, position, wavenumber):
