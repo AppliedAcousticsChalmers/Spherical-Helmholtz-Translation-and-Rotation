@@ -68,10 +68,14 @@ class LegendrePolynomials(coordinates.OwnerMixin):
             expansion_data = np.asarray(expansion)
         return self._contract(expansion_data, self._data)
 
+    def __getitem__(self, key):
+        return self._data[..., key]
+
 
 class AssociatedLegendrePolynomials(LegendrePolynomials):
     _calculate = staticmethod(_bases.associated_legendre_polynomials)
     _contract = staticmethod(_bases.associated_legendre_contraction)
+    _indexing = staticmethod(_bases.associated_legendre_indexing)
 
     @classmethod
     def num_unique_to_order(cls, num_unique):
@@ -80,6 +84,17 @@ class AssociatedLegendrePolynomials(LegendrePolynomials):
     @classmethod
     def num_unique(cls, order):
         return (order + 1) * (order + 2) // 2
+
+    def __getitem__(self, key):
+        try:
+            n, m = key
+            n, m = np.broadcast_arrays(n, m)
+            indices = np.stack([n, m], axis=1)
+        except ValueError:
+            indices = np.asarray(key)
+        if indices.ndim != 2:
+            raise ValueError('Cannot index AssociatedLegendrePolynomials with multidimentional arrays')
+        return self._indexing(self._data, indices)
 
 
 class RadialBaseClass(coordinates.OwnerMixin):
