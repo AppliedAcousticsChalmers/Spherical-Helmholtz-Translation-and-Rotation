@@ -19,7 +19,7 @@ def _wrap_indexing(key, func, *args):
 
 
 class LegendrePolynomials(coordinates.OwnerMixin):
-    _calculate = staticmethod(_bases.legendre_polynomials)
+    _evaluate = staticmethod(_bases.legendre_polynomials)
     _contract = staticmethod(_bases.legendre_contraction)
 
     def __init__(self, order, position=None, colatitude=None, x=None, defer_evaluation=False):
@@ -72,7 +72,7 @@ class LegendrePolynomials(coordinates.OwnerMixin):
         else:
             raise TypeError(f'Unknown type of coordinate {type(self.coordinate)}')
 
-        self._calculate(arg, order=self.order, out=self._data)
+        self._evaluate(arg, order=self.order, out=self._data)
         return self
 
     def apply(self, expansion):
@@ -87,7 +87,7 @@ class LegendrePolynomials(coordinates.OwnerMixin):
 
 
 class AssociatedLegendrePolynomials(LegendrePolynomials):
-    _calculate = staticmethod(_bases.associated_legendre_polynomials)
+    _evaluate = staticmethod(_bases.associated_legendre_polynomials)
     _contract = staticmethod(_bases.associated_legendre_contraction)
 
     @classmethod
