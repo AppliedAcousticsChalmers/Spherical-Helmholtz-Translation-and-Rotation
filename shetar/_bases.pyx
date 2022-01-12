@@ -81,7 +81,12 @@ def legendre_polynomials(x, order=None, out=None):
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
-cdef void legendre_polynomials_calculation(double[:, :] output, double[:] x, Py_ssize_t idx, Py_ssize_t N) nogil:
+cdef void legendre_polynomials_calculation(
+    double[:, :] output,
+    double[:] x,
+    Py_ssize_t idx,
+    Py_ssize_t N
+) nogil:
     cdef:
         Py_ssize_t n
         double n_minus_1_factor, n_minus_2_factor
@@ -128,9 +133,12 @@ def associated_legendre_polynomials(x, order=None, out=None):
 @cython.cdivision(True)
 @cython.wraparound(False)
 cdef void associated_legendre_polynomials_calculation(
-        double[:, :] data, double[:] x, double[:] one_minus_x_square,
-        Py_ssize_t idx_elem, Py_ssize_t N
-    ) nogil:
+        double[:, :] data,
+        double[:] x,
+        double[:] one_minus_x_square,
+        Py_ssize_t idx_elem,
+        Py_ssize_t N
+) nogil:
     cdef:
         Py_ssize_t n, m, idx_assign, idx_m1, idx_m2
         double fact_m1, fact_m2
@@ -214,9 +222,14 @@ def legendre_contraction(expansion_data, base_data, out=None):
 @cython.cdivision(True)
 @cython.wraparound(False)
 cdef void legendre_contraction_calculation(
-    double[:] output, double[:, :] expansion_data, double[:, :] base_data,
-    Py_ssize_t out_elem_idx, Py_ssize_t exp_elem_idx, Py_ssize_t base_elem_idx, Py_ssize_t N
-    ) nogil :
+    double[:] output,
+    double[:, :] expansion_data,
+    double[:, :] base_data,
+    Py_ssize_t out_elem_idx,
+    Py_ssize_t exp_elem_idx,
+    Py_ssize_t base_elem_idx,
+    Py_ssize_t N
+) nogil :
     cdef Py_ssize_t n
     for n in range(N):
         output[out_elem_idx] += expansion_data[exp_elem_idx, n] * base_data[base_elem_idx, n]
@@ -265,9 +278,14 @@ def associated_legendre_contraction(expansion_data, base_data, out=None):
 @cython.cdivision(True)
 @cython.wraparound(False)
 cdef void associated_legendre_contraction_calculation(
-    double[:] output, double[:, :] expansion_data, double[:, :] base_data,
-    Py_ssize_t out_elem_idx, Py_ssize_t exp_elem_idx, Py_ssize_t base_elem_idx, Py_ssize_t N
-    ) nogil:
+    double[:] output,
+    double[:, :] expansion_data,
+    double[:, :] base_data,
+    Py_ssize_t out_elem_idx,
+    Py_ssize_t exp_elem_idx,
+    Py_ssize_t base_elem_idx,
+    Py_ssize_t N
+) nogil:
     cdef:
         Py_ssize_t n, m, exp_idx, base_idx, exp_idx_neg
         int sign
@@ -336,9 +354,16 @@ def spherical_harmonics_contraction(expansion_data, legendre_data, phase_data, o
 @cython.cdivision(True)
 @cython.wraparound(False)
 cdef void spherical_harmonics_contraction_calculation(
-    double complex[:] output, double complex[:, :] expansion_data, double[:, :] legendre_data, double complex[:] phase_data,
-    Py_ssize_t out_elem_idx, Py_ssize_t exp_elem_idx, Py_ssize_t legendre_elem_idx, Py_ssize_t phase_elem_idx, Py_ssize_t N
-    ) nogil:
+    double complex[:] output,
+    double complex[:, :] expansion_data,
+    double[:, :] legendre_data,
+    double complex[:] phase_data,
+    Py_ssize_t out_elem_idx,
+    Py_ssize_t exp_elem_idx,
+    Py_ssize_t legendre_elem_idx,
+    Py_ssize_t phase_elem_idx,
+    Py_ssize_t N
+) nogil:
     cdef:
         Py_ssize_t n, m, exp_idx, exp_idx_neg, legendre_idx
         double complex phase_power, positive_partial, negative_partial
@@ -425,11 +450,18 @@ def multipole_contraction(expansion_data, radial_data, legendre_data, phase_data
 @cython.cdivision(True)
 @cython.wraparound(False)
 cdef void multipole_contraction_calculation(
-    double complex[:] output, double complex[:, :] expansion_data, 
-    double complex[:, :] radial_data, double[:, :] legendre_data, double complex[:] phase_data,
-    Py_ssize_t out_elem_idx, Py_ssize_t exp_elem_idx, 
-    Py_ssize_t radial_elem_idx, Py_ssize_t legendre_elem_idx, Py_ssize_t phase_elem_idx, Py_ssize_t N
-    ) nogil:
+    double complex[:] output,
+    double complex[:, :] expansion_data, 
+    double complex[:, :] radial_data,
+    double[:, :] legendre_data,
+    double complex[:] phase_data,
+    Py_ssize_t out_elem_idx,
+    Py_ssize_t exp_elem_idx, 
+    Py_ssize_t radial_elem_idx,
+    Py_ssize_t legendre_elem_idx,
+    Py_ssize_t phase_elem_idx,
+    Py_ssize_t N
+) nogil:
     cdef:
         Py_ssize_t n, m, exp_idx, exp_idx_neg, legendre_idx
         double complex phase_power, positive_partial, negative_partial
