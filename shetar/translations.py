@@ -1,5 +1,5 @@
 import numpy as np
-from . import coordinates, rotations, expansions
+from . import coordinates, rotations, expansions, _translations
 
 
 class CoaxialTranslation(coordinates.OwnerMixin):
@@ -18,7 +18,7 @@ class CoaxialTranslation(coordinates.OwnerMixin):
             - (self._min_order * (self._min_order + 1)) // 2 * (self._min_order + self._max_order + 2)
             + (self._min_order * (self._min_order - 1) * (self._min_order + 1)) // 6
         )
-        self._data = np.zeros((num_unique,) + np.shape(wavenumber) + self.coordinate.shapes.radius, self._dtype)
+        self._data = np.zeros(self.coordinate.shapes.radius + (num_unique,), self._dtype)
 
         if not defer_evaluation:
             self.evaluate(position=self.coordinate)
@@ -117,6 +117,9 @@ class CoaxialTranslation(coordinates.OwnerMixin):
         if wavenumber is not None:
             self._wavenumber = np.asarray(wavenumber)
         self.coordinate = coordinates.Translation.parse_args(position=position, radius=radius)
+        self._evaluate(self.coordinate.radius * self.wavenumber, input_order=self.input_order, output_order=self.output_order, out=self._data)
+        return self
+
         # The computation is split in two domains for p, the stored and the buffered.
         # The stored range is p <= P, i.e. the values we are interested in.
         # The buffered range is P < p <= N + P - m, which are values needed to
@@ -240,18 +243,21 @@ class CoaxialTranslation(coordinates.OwnerMixin):
 
 
 class InteriorCoaxialTranslation(CoaxialTranslation):
+    _evaluate = staticmethod(_translations.coaxial_translation_intradomain_coefficients)
     _dtype = float
     from .bases import RegularRadialBase as _recurrence_initialization
     _default_output_type = expansions.InteriorExpansion
 
 
 class ExteriorCoaxialTranslation(CoaxialTranslation):
+    _evaluate = staticmethod(_translations.coaxial_translation_intradomain_coefficients)
     _dtype = float
     from .bases import RegularRadialBase as _recurrence_initialization
     _default_output_type = expansions.ExteriorExpansion
 
 
 class ExteriorInteriorCoaxialTranslation(CoaxialTranslation):
+    _evaluate = staticmethod(_translations.coaxial_translation_interdomain_coefficients)
     _dtype = complex
     from .bases import SingularRadialBase as _recurrence_initialization
     _default_output_type = expansions.InteriorExpansion

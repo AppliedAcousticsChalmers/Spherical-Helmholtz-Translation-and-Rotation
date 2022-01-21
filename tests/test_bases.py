@@ -55,7 +55,7 @@ def position(request):
 
 @pytest.fixture(scope='module')
 def wavenumber(position):
-    return np.random.uniform(low=1e-3, high=1, size=position.shape)
+    return np.random.uniform(low=1e-3, high=1, size=position.shape[:-1])
 
 
 def test_legendre_values(order, cosine_colatitude):
@@ -100,7 +100,7 @@ def test_spherical_harmonics_values(order, colatitude, azimuth):
 
 def test_regular_base_values(order, position, wavenumber):
     radius = np.sum(position**2, axis=-1) ** 0.5
-    kr = radius * wavenumber.reshape(wavenumber.shape + (1,) * np.ndim(radius))
+    kr = radius * wavenumber
     colatitude = np.arccos(position[..., 2] / radius)
     azimuth = np.arctan2(position[..., 1], position[..., 0])
 
@@ -117,7 +117,7 @@ def test_regular_base_values(order, position, wavenumber):
 
 def test_singular_base_values(order, position, wavenumber):
     radius = np.sum(position**2, axis=-1) ** 0.5
-    kr = radius * wavenumber.reshape(wavenumber.shape + (1,) * np.ndim(radius))
+    kr = radius * wavenumber
     colatitude = np.arccos(position[..., 2] / radius)
     azimuth = np.arctan2(position[..., 1], position[..., 0])
 

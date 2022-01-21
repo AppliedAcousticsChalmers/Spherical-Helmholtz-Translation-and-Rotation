@@ -118,7 +118,9 @@ class RadialBaseClass(coordinates.OwnerMixin):
             # TODO: this should raise!
             x = self.coordinate.radius
         else:
-            x = self.coordinate.radius * np.reshape(self.wavenumber, np.shape(self.wavenumber) + (1,) * self.ndim)
+            # TODO: I don't think we should auto-broadcast the wavenumber.
+            x = self.coordinate.radius * self.wavenumber
+            # x = self.coordinate.radius * np.reshape(self.wavenumber, np.shape(self.wavenumber) + (1,) * self.ndim)
 
         order = np.arange(self.order + 1)
         self._data = self._radial_func(order, x[..., None])
