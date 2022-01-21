@@ -1,6 +1,5 @@
 import numpy as np
 cimport cython
-from cython.parallel import prange
 from ._shapes import prepare_strides, broadcast_shapes
 from ._shapes cimport broadcast_index
 
@@ -69,10 +68,9 @@ def legendre_polynomials(x, order=None, out=None):
         double[:] x_cy = x.reshape(-1)
         double[:, :] out_cy = out.reshape((np.size(x), num_unique))
 
-    if x.ndim == 0:
-        legendre_polynomials_calculation(out_cy, x_cy, 0, N)
-    else:
-        for idx in prange(num_elements, nogil=True):
+
+    with nogil:
+        for idx in range(num_elements):
             legendre_polynomials_calculation(out_cy, x_cy, idx, N)
 
     return out
@@ -121,10 +119,8 @@ def associated_legendre_polynomials(x, order=None, out=None):
         double[:] one_minus_x_square = 1 - x.reshape(-1)**2
         double[:, :] out_cy = out.reshape((-1, num_unique))
 
-    if out.ndim == 1:
-        associated_legendre_polynomials_calculation(out_cy, x_cy, one_minus_x_square, 0, N)
-    else:
-        for idx_elem in prange(num_elements, nogil=True):
+    with nogil:
+        for idx_elem in range(num_elements):
             associated_legendre_polynomials_calculation(out_cy, x_cy, one_minus_x_square, idx_elem, N)
     return out
 
@@ -198,8 +194,8 @@ def legendre_contraction(expansion_data, base_data, out=None):
         double[:] out_cy = out.reshape(-1)
         Py_ssize_t N = output_order
 
-    if out.ndim == 0:
-        # No loop over elements.
+    if out.size == 1:
+        # No loop over elements, saves notable time due to stride calculations.
         legendre_contraction_calculation(out_cy, exp_cy, base_cy, 0, 0, 0, N)
         return out
 
@@ -210,10 +206,11 @@ def legendre_contraction(expansion_data, base_data, out=None):
         Py_ssize_t exp_idx, base_idx, out_idx
         Py_ssize_t num_elements = out.size, ndim = out.ndim
 
-    for out_idx in prange(num_elements, nogil=True):
-        exp_idx = broadcast_index(out_idx, exp_stride, out_stride, ndim)
-        base_idx = broadcast_index(out_idx, base_stride, out_stride, ndim)
-        legendre_contraction_calculation(out_cy, exp_cy, base_cy, out_idx, exp_idx, base_idx, N)
+    with nogil:
+        for out_idx in range(num_elements):
+            exp_idx = broadcast_index(out_idx, exp_stride, out_stride, ndim)
+            base_idx = broadcast_index(out_idx, base_stride, out_stride, ndim)
+            legendre_contraction_calculation(out_cy, exp_cy, base_cy, out_idx, exp_idx, base_idx, N)
 
     return out
 
@@ -255,7 +252,8 @@ def associated_legendre_contraction(expansion_data, base_data, out=None):
         double[:] out_cy = out.reshape(-1)
         Py_ssize_t N = output_order
 
-    if out.ndim == 0:
+    if out.size == 1:
+        # No loop over elements, saves notable time due to stride calculations.
         associated_legendre_contraction_calculation(out_cy, exp_cy, base_cy, 0, 0, 0, N)
         return out
 
@@ -266,8 +264,8 @@ def associated_legendre_contraction(expansion_data, base_data, out=None):
         Py_ssize_t exp_elem_idx, base_elem_idx, out_elem_idx
         Py_ssize_t num_elements = out.size, ndim = out.ndim
 
-    with cython.boundscheck(False), cython.cdivision(True), cython.wraparound(False), nogil:
-        for out_elem_idx in prange(num_elements):
+    with nogil:
+        for out_elem_idx in range(num_elements):
             exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
             base_elem_idx = broadcast_index(out_elem_idx, base_stride, out_stride, ndim)
             associated_legendre_contraction_calculation(out_cy, exp_cy, base_cy, out_elem_idx, exp_elem_idx, base_elem_idx, N)
@@ -327,7 +325,8 @@ def spherical_harmonics_contraction(expansion_data, legendre_data, phase_data, o
         double complex[:] out_cy = out.reshape(-1), phase_cy = phase_data.reshape(-1)
         Py_ssize_t N = output_order
 
-    if out.ndim == 0:
+    if out.size == 1:
+        # No loop over elements, saves notable time due to stride calculations.
         spherical_harmonics_contraction_calculation(out_cy, exp_cy, legendre_cy, phase_cy, 0, 0, 0, 0, N)
         out /= (2 * np.pi)**0.5
         return out
@@ -340,11 +339,12 @@ def spherical_harmonics_contraction(expansion_data, legendre_data, phase_data, o
         Py_ssize_t exp_elem_idx, legendre_elem_idx, phase_elem_idx, out_elem_idx
         Py_ssize_t num_elements = out.size, ndim = out.ndim
 
-    for out_elem_idx in prange(num_elements, nogil=True):
-        exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
-        legendre_elem_idx = broadcast_index(out_elem_idx, legendre_stride, out_stride, ndim)
-        phase_elem_idx = broadcast_index(out_elem_idx, phase_stride, out_stride, ndim)
-        spherical_harmonics_contraction_calculation(out_cy, exp_cy, legendre_cy, phase_cy, out_elem_idx, exp_elem_idx, legendre_elem_idx, phase_elem_idx, N)
+    with nogil:
+        for out_elem_idx in range(num_elements):
+            exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
+            legendre_elem_idx = broadcast_index(out_elem_idx, legendre_stride, out_stride, ndim)
+            phase_elem_idx = broadcast_index(out_elem_idx, phase_stride, out_stride, ndim)
+            spherical_harmonics_contraction_calculation(out_cy, exp_cy, legendre_cy, phase_cy, out_elem_idx, exp_elem_idx, legendre_elem_idx, phase_elem_idx, N)
 
     out /= (2 * np.pi)**0.5
     return out
@@ -418,7 +418,8 @@ def multipole_contraction(expansion_data, radial_data, legendre_data, phase_data
         double complex[:] out_cy = out.reshape(-1)
         Py_ssize_t N = output_order
 
-    if out.ndim == 0:
+    if out.size == 1:
+        # No loop over elements, saves notable time due to stride calculations.
         multipole_contraction_calculation(out_cy, exp_cy, radial_cy, legendre_cy, phase_cy, 0, 0, 0, 0, 0, N)
         out /= (2 * np.pi)**0.5
         return out
@@ -432,15 +433,16 @@ def multipole_contraction(expansion_data, radial_data, legendre_data, phase_data
         Py_ssize_t exp_elem_idx, legendre_elem_idx, phase_elem_idx, radial_elem_idx, out_elem_idx
         Py_ssize_t num_elements = out.size, ndim = out.ndim
 
-    for out_elem_idx in prange(num_elements, nogil=True):
-        exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
-        legendre_elem_idx = broadcast_index(out_elem_idx, legendre_stride, out_stride, ndim)
-        phase_elem_idx = broadcast_index(out_elem_idx, phase_stride, out_stride, ndim)
-        radial_elem_idx = broadcast_index(out_elem_idx, radial_stride, out_stride, ndim)
-        multipole_contraction_calculation(
-            out_cy, exp_cy, radial_cy, legendre_cy, phase_cy, 
-            out_elem_idx, exp_elem_idx, radial_elem_idx, legendre_elem_idx, phase_elem_idx, N
-        )
+    with nogil:
+        for out_elem_idx in range(num_elements):
+            exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
+            legendre_elem_idx = broadcast_index(out_elem_idx, legendre_stride, out_stride, ndim)
+            phase_elem_idx = broadcast_index(out_elem_idx, phase_stride, out_stride, ndim)
+            radial_elem_idx = broadcast_index(out_elem_idx, radial_stride, out_stride, ndim)
+            multipole_contraction_calculation(
+                out_cy, exp_cy, radial_cy, legendre_cy, phase_cy, 
+                out_elem_idx, exp_elem_idx, radial_elem_idx, legendre_elem_idx, phase_elem_idx, N
+            )
 
     out /= (2 * np.pi)**0.5
     return out

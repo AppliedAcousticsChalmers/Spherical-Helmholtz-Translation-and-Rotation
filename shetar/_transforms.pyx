@@ -1,6 +1,6 @@
 import numpy as np
 import cython
-from cython.parallel import prange
+cimport cython
 from ._bases import associated_legendre_polynomials
 from ._bases cimport associated_legendre_index, spherical_expansion_index
 from ._shapes import prepare_strides, broadcast_shapes
@@ -63,10 +63,8 @@ def colatitude_rotation_coefficients(colatitude, order=None, out=None):
         double[:] sin = sine_colatitude.reshape(-1)
         Py_ssize_t n, p, m, idx_elem, N = order, num_elem = np.size(colatitude)
 
-    if out.ndim == 1:
-        colatitude_rotation_coefficients_calculation(out_cy, legendre, cos, sin, 0, N)
-    else:
-        for idx_elem in prange(num_elem, nogil=True):
+    with nogil:
+        for idx_elem in range(num_elem):
             colatitude_rotation_coefficients_calculation(out_cy, legendre, cos, sin, idx_elem, N)
 
     return out
@@ -158,7 +156,8 @@ def colatitude_rotation_transform(expansion_data, colatitude_rotation_coefficien
     else:
         rot_impl = colatitude_forward_impl
 
-    if out.ndim == 1:
+    if out.size == output_unique:
+        # No loop over elements, saves notable time due to stride calculations.
         rotation_core_loop(out_cy, exp_cy, trans_cy, primary_phase, secondary_phase, 0, 0, 0, 0, 0, N, rot_impl)
         return out
 
@@ -169,10 +168,11 @@ def colatitude_rotation_transform(expansion_data, colatitude_rotation_coefficien
         Py_ssize_t exp_elem_idx, trans_elem_idx, out_elem_idx
         Py_ssize_t num_elements = out.shape[0], ndim = out.ndim
 
-    for out_elem_idx in prange(num_elements, nogil=True):
-        exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
-        trans_elem_idx = broadcast_index(out_elem_idx, trans_stride, out_stride, ndim)
-        rotation_core_loop(out_cy, exp_cy, trans_cy, primary_phase, secondary_phase, out_elem_idx, exp_elem_idx, trans_elem_idx, 0, 0, N, rot_impl)
+    with nogil:
+        for out_elem_idx in range(num_elements):
+            exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
+            trans_elem_idx = broadcast_index(out_elem_idx, trans_stride, out_stride, ndim)
+            rotation_core_loop(out_cy, exp_cy, trans_cy, primary_phase, secondary_phase, out_elem_idx, exp_elem_idx, trans_elem_idx, 0, 0, N, rot_impl)
 
     return out
 
@@ -209,7 +209,7 @@ def full_rotation_transform(expansion_data, colatitude_rotation_coefficients, pr
     else:
         rot_impl = rotation_forward_impl
 
-    if out.ndim == 1:
+    if out.size == output_unique:
         rotation_core_loop(out_cy, exp_cy, trans_cy, primary_phase_cy, secondary_phase_cy, 0, 0, 0, 0, 0, N, rot_impl)
         return out
 
@@ -222,12 +222,13 @@ def full_rotation_transform(expansion_data, colatitude_rotation_coefficients, pr
         Py_ssize_t exp_elem_idx, colat_elem_idx, prim_elem_idx, second_elem_idx, out_elem_idx
         Py_ssize_t num_elements = out.shape[0], ndim = out.ndim
 
-    for out_elem_idx in prange(num_elements, nogil=True):
-        exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
-        colat_elem_idx = broadcast_index(out_elem_idx, colatitude_stride, out_stride, ndim)
-        prim_elem_idx = broadcast_index(out_elem_idx, primary_stride, out_stride, ndim)
-        second_elem_idx = broadcast_index(out_elem_idx, secondary_stride, out_stride, ndim)
-        rotation_core_loop(out_cy, exp_cy, trans_cy, primary_phase_cy, secondary_phase_cy, out_elem_idx, exp_elem_idx, colat_elem_idx, prim_elem_idx, second_elem_idx, N, rot_impl)
+    with nogil:
+        for out_elem_idx in range(num_elements):
+            exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
+            colat_elem_idx = broadcast_index(out_elem_idx, colatitude_stride, out_stride, ndim)
+            prim_elem_idx = broadcast_index(out_elem_idx, primary_stride, out_stride, ndim)
+            second_elem_idx = broadcast_index(out_elem_idx, secondary_stride, out_stride, ndim)
+            rotation_core_loop(out_cy, exp_cy, trans_cy, primary_phase_cy, secondary_phase_cy, out_elem_idx, exp_elem_idx, colat_elem_idx, prim_elem_idx, second_elem_idx, N, rot_impl)
 
     return out
 
