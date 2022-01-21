@@ -1,21 +1,21 @@
 import numpy as np
 from . import coordinates, expansions
-from . import _transforms
+from . import _rotations
 
 
 class ColatitudeRotation(coordinates.OwnerMixin):
-    _evaluate = staticmethod(_transforms.colatitude_rotation_coefficients)
+    _evaluate = staticmethod(_rotations.colatitude_rotation_coefficients)
 
     def __init__(self, order, position=None, colatitude=None, defer_evaluation=False):
         self.coordinate = coordinates.Rotation.parse_args(position=position, colatitude=colatitude)
-        num_unique = _transforms.colatitude_order_to_unique(order)
+        num_unique = _rotations.colatitude_order_to_unique(order)
         self._data = np.zeros(self.coordinate.shapes.colatitude + (num_unique,), dtype=float)
         if not defer_evaluation:
             self.evaluate(self.coordinate)
 
     @property
     def order(self):
-        return _transforms.colatitude_unique_to_order(self._data.shape[-1])
+        return _rotations.colatitude_unique_to_order(self._data.shape[-1])
 
     @property
     def shape(self):
@@ -36,7 +36,7 @@ class ColatitudeRotation(coordinates.OwnerMixin):
         return self
 
     def _transform(self, expansion_data, inverse, out_data):
-        return _transforms.colatitude_rotation_transform(expansion_data, self._data, inverse, out=out_data)
+        return _rotations.colatitude_rotation_transform(expansion_data, self._data, inverse, out=out_data)
 
     def apply(self, expansion, inverse=False, out=None):
         if isinstance(expansion, expansions.Expansion):
@@ -75,7 +75,7 @@ class Rotation(ColatitudeRotation):
         super().__init__(order=order, position=coordinate, defer_evaluation=defer_evaluation)
 
     def _transform(self, expansion_data, inverse, out_data):
-        return _transforms.full_rotation_transform(expansion_data, self._data, self._primary_phase, self._secondary_phase, inverse, out=out_data)
+        return _rotations.full_rotation_transform(expansion_data, self._data, self._primary_phase, self._secondary_phase, inverse, out=out_data)
 
     def evaluate(self, position=None, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None):
         if (position is None) and (new_z_axis is None) and (old_z_axis is None) and (colatitude is None):
