@@ -1,11 +1,14 @@
 import numpy as np
 import cython
-from cython.parallel import prange, parallel
+cimport cython
 from ._shapes import prepare_strides, broadcast_shapes
 from ._shapes cimport broadcast_index
 
 from scipy.special import spherical_jn, spherical_yn
 
+ctypedef fused double_complex:
+    double
+    double complex
 
 @cython.cdivision(True)
 cdef inline Py_ssize_t coaxial_translation_mode_index(Py_ssize_t mode, Py_ssize_t min_order, Py_ssize_t max_order) nogil:
@@ -38,58 +41,100 @@ def coaxial_order_to_unique(input_order, output_order):
     return num_unique
 
 
-
-def coaxial_translation_coefficients(distance, input_order, output_order, cross_domain=False, out=None):
+def coaxial_translation_interdomain_coefficients(distance, input_order, output_order, out=None):
     output_shape = np.shape(distance)
 
     num_unique = coaxial_order_to_unique(input_order, output_order)
     if out is None:
-        out = np.zeros(output_shape + (num_unique,), dtype=complex if cross_domain else float)
+        out = np.zeros(output_shape + (num_unique,), dtype=complex)
     else:
         if out.shape[:-1] != output_shape:
             raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for coaxial translation coefficients with distance shape {output_shape}')
         if out.shape[-1] != num_unique:
             raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for coaxial translation coefficients of {input_order = } and {output_order = }, requiring {num_unique} unique values')
 
+
+    buffer_shape = min(input_order, output_order) + 1
+    x_init = distance.reshape((-1, 1))
+    n_init = np.arange(input_order + output_order + 1)
     cdef:
         int num_elements = np.size(distance)
-        int buffer_shape = min(input_order, output_order) + 1
-
-    initialization = spherical_jn(np.arange(input_order + output_order + 1), distance.reshape((-1, 1)))
-    if cross_domain:
-        initialization = initialization + 1j * spherical_yn(np.arange(input_order + output_order + 1), distance.reshape((-1, 1)))
-
-    cdef:
-        double[:, :] out_cy = out.reshape((-1, num_unique))
-        double[:, :] initialization_cy = initialization    
+        double complex [:, :] initialization = spherical_jn(n_init, x_init) + 1j * spherical_yn(n_init, x_init)
+        double complex [:, :] out_cy = out.reshape((-1, num_unique))
+        double complex [:, :] initialization_cy = initialization    
         Py_ssize_t min_order = min(input_order, output_order)
         Py_ssize_t max_order = max(input_order, output_order)
         Py_ssize_t idx_elem
+        double complex [:] m_buffer = np.zeros(buffer_shape, complex)
+        double complex [:] m_minus_one_buffer = np.zeros(buffer_shape, complex)
+        double complex [:] n_minus_one_buffer = np.zeros(buffer_shape, complex)
+        double complex [:] n_minus_two_buffer = np.zeros(buffer_shape, complex)
 
-    if num_elements == 1:
-        coaxial_translation_coefficients_calculation(
-            out_cy, initialization_cy, 0,
-            min_order, max_order,
-            np.zeros(buffer_shape), np.zeros(buffer_shape),
-            np.zeros(buffer_shape), np.zeros(buffer_shape),
-        )
-        return out
+    with nogil:
+        for idx_elem in range(num_elements):
+            coaxial_translation_coefficients_calculation(
+                out_cy, initialization_cy, idx_elem,
+                min_order, max_order,
+                m_buffer, m_minus_one_buffer,
+                n_minus_one_buffer, n_minus_two_buffer,
+            )
+
+    return out
+
+
+def coaxial_translation_intradomain_coefficients(distance, input_order, output_order, out=None):
+    output_shape = np.shape(distance)
+
+    num_unique = coaxial_order_to_unique(input_order, output_order)
+    if out is None:
+        out = np.zeros(output_shape + (num_unique,), dtype=float)
+    else:
+        if out.shape[:-1] != output_shape:
+            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for coaxial translation coefficients with distance shape {output_shape}')
+        if out.shape[-1] != num_unique:
+            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for coaxial translation coefficients of {input_order = } and {output_order = }, requiring {num_unique} unique values')
+    
+    buffer_shape = min(input_order, output_order) + 1
+    x_init = distance.reshape((-1, 1))
+    n_init = np.arange(input_order + output_order + 1)
+    cdef:
+        int num_elements = np.size(distance)
+        double[:, :] initialization = spherical_jn(n_init, x_init)
+        double[:, :] out_cy = out.reshape((-1, num_unique))
+        Py_ssize_t min_order = min(input_order, output_order)
+        Py_ssize_t max_order = max(input_order, output_order)
+        Py_ssize_t idx_elem
+        double[:] m_buffer = np.zeros(buffer_shape, float)
+        double[:] m_minus_one_buffer = np.zeros(buffer_shape, float)
+        double[:] n_minus_one_buffer = np.zeros(buffer_shape, float)
+        double[:] n_minus_two_buffer = np.zeros(buffer_shape, float)
+
+    with nogil:
+        for idx_elem in range(num_elements):
+            coaxial_translation_coefficients_calculation(
+                out_cy, initialization, idx_elem,
+                min_order, max_order,
+                m_buffer, m_minus_one_buffer,
+                n_minus_one_buffer, n_minus_two_buffer,
+            )
+
+    return out
 
 
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
 cdef void coaxial_translation_coefficients_calculation(
-    double[:, :] output,
-    double[:, :] initialization,
+    double_complex[:, :] output,
+    double_complex[:, :] initialization,
     Py_ssize_t idx_elem,
     Py_ssize_t N,
     Py_ssize_t P,
-    double[:] m_buffer,
-    double[:] m_minus_one_buffer,
-    double[:] n_minus_one_buffer,
-    double[:] n_minus_two_buffer,
-):
+    double_complex[:] m_buffer,
+    double_complex[:] m_minus_one_buffer,
+    double_complex[:] n_minus_one_buffer,
+    double_complex[:] n_minus_two_buffer,
+) nogil:
 
     cdef:
         Py_ssize_t n, p, m
