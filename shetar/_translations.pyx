@@ -3,6 +3,7 @@ import cython
 cimport cython
 from ._shapes import prepare_strides, broadcast_shapes
 from ._shapes cimport broadcast_index
+from ._bases cimport spherical_expansion_index
 
 from scipy.special import spherical_jn, spherical_yn
 
@@ -225,10 +226,161 @@ cdef void coaxial_translation_coefficients_calculation(
 
 
 
+def coaxial_translation_transform(expansion_data, coaxial_translation_coefficients, output_order, inverse=False, out=None):
+    output_shape, expansion_shape, transform_shape = broadcast_shapes(
+        expansion_data.shape[:-1], coaxial_translation_coefficients.shape[:-1]
+    )
 
-def coaxial_translation_transform():
-    pass
+    
+    if coaxial_translation_coefficients.shape[-1] !=  coaxial_order_to_unique(min_order, max_order):
+        raise ValueError(f'Coaxial translation coefficients with {coaxial_translation_coefficients.shape[-1]} unique values does not match specifiend tranfsform orders {min_order, max_order}')
+    expansion_order = int(expansion_data.shape[-1] ** 0.5) - 1
+    output_unique = (output_order + 1)**2
+
+    if out is None:
+        out = np.zeros(output_shape + (output_unique,), complex)
+    else:
+        if out.shape[:-1] != output_shape:
+            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for translation of expansion of shape {expansion_shape} and transform shape {transform_shape}')
+        if out.shape[-1] != output_unique:
+            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for translation of expansion with order {output_order}, requiring {output_unique} unique values')
+
+    if not np.iscomplexobj(coaxial_translation_coefficients):
+        # We need a complex object so that the assignment wont break.
+        # This will use a bit extra memory while running, but probably not extra
+        # cpu since the doubles will always be promoted to complex in the calculation anyhow,
+        # seing how they are always multiplied with other complex values.
+        coaxial_translation_coefficients = coaxial_translation_coefficients + 0j
+
+    cdef:
+        double complex [:, :] out_cy = out.reshape((-1, out.shape[-1]))
+        double complex [:, :] exp_cy = expansion_data.reshape((-1, expansion_data.shape[-1]))
+        double complex[:, :] trans_cy = coaxial_translation_coefficients.reshape((-1, coaxial_translation_coefficients.shape[-1]))
+        translation_implementation trans_func
+        Py_ssize_t min_order = min(output_order, expansion_order)
+        Py_ssize_t max_order = max(output_order, expansion_order)
+
+    if inverse:
+        trans_func = inverse_coaxial_implementation
+    else:
+        trans_func = forward_coaxial_implementation
+
+    if out.size == output_unique:
+        # No loop over elements
+        coaxial_translation_transform_calculation(out_cy, exp_cy, trans_cy, 0, 0, 0, min_order, max_order, trans_func)
+        return out
+
+    cdef:
+        Py_ssize_t[:] out_stride = prepare_strides(output_shape, output_shape)
+        Py_ssize_t[:] exp_stride = prepare_strides(expansion_shape, output_shape)
+        Py_ssize_t[:] trans_stride = prepare_strides(transform_shape, output_shape)
+        Py_ssize_t out_elem_idx, exp_elem_idx, trans_elem_idx
+        Py_ssize_t num_elements = out_cy.shape[0], ndim = out.ndim
+
+    with nogil:
+        for out_elem_idx in range(num_elements):
+            exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
+            trans_elem_idx = broadcast_index(out_elem_idx, transform_shape, out_stride, ndim)
+            coaxial_translation_transform_calculation(out_cy, exp_cy, trans_cy, out_elem_idx, exp_elem_idx, trans_elem_idx, min_order, max_order, trans_func)
+
+    return out
 
 
-cdef void coaxial_translation_transform_calculation():
-    pass
+ctypedef void (*translation_implementation)(
+    Py_ssize_t n,
+    Py_ssize_t p,
+    Py_ssize_t m,
+    double complex [:, :] output,
+    double complex [:, :] expansion,
+    double complex transform,
+    Py_ssize_t out_elem_idx,
+    Py_ssize_t exp_elem_idx,
+) nogil
+
+
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
+cdef void forward_coaxial_implementation(
+    Py_ssize_t n,
+    Py_ssize_t p,
+    Py_ssize_t m,
+    double complex [:, :] output,
+    double complex [:, :] expansion,
+    double complex transform,
+    Py_ssize_t out_elem_idx,
+    Py_ssize_t exp_elem_idx
+) nogil:
+    cdef Py_ssize_t out_idx = spherical_expansion_index(p, m)
+    cdef Py_ssize_t exp_idx = spherical_expansion_index(n, m)
+    output[out_elem_idx, out_idx] = output[out_elem_idx, out_idx] + expansion[exp_elem_idx, exp_idx] * transform
+
+
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
+cdef void inverse_coaxial_implementation(
+    Py_ssize_t n,
+    Py_ssize_t p,
+    Py_ssize_t m,
+    double complex [:, :] output,
+    double complex [:, :] expansion,
+    double complex transform,
+    Py_ssize_t out_elem_idx,
+    Py_ssize_t exp_elem_idx
+) nogil:
+    cdef Py_ssize_t out_idx = spherical_expansion_index(n, m)
+    cdef Py_ssize_t exp_idx = spherical_expansion_index(p, m)
+    output[out_elem_idx, out_idx] = output[out_elem_idx, out_idx] + expansion[exp_elem_idx, exp_idx] * transform
+
+
+
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
+cdef void coaxial_translation_transform_calculation(
+    double complex [:, :] output,
+    double complex [:, :] expansion,
+    double complex [:, :] transform,
+    Py_ssize_t out_elem_idx,
+    Py_ssize_t exp_elem_idx,
+    Py_ssize_t trans_elem_idx,
+    Py_ssize_t N_max,
+    Py_ssize_t P_max,
+    Py_ssize_t min_order,
+    Py_ssize_t max_order,
+    translation_implementation trans_func,
+) nogil:
+    cdef:
+        Py_ssize_t trans_idx, n, p, m
+        short sign
+    # comments indicate [n, p, m]
+    trans_idx = -1
+    # deal with m=0, since that removes the -m symmetry
+    for n in range(min_order + 1):
+        trans_idx += 1
+        sign = 1  # (-1)**(2n)
+        # trans_idx <=> trans[n, n, 0]
+        trans_func(n, n, 0, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+        for p in range(n + 1, max_order):
+            trans_idx += 1
+            sign = -sign
+            # trans_idx <=> trans[n, p, 0]
+            trans_func(n, p, 0, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+            trans_func(p, n, 0, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+
+    for m in range(1, min_order + 1):
+        for n in range(m, min_order + 1):
+            # trans_idx <=> trans[n, n, m]
+            trans_idx += 1
+            sign = 1  # (-1)**(2n)
+            trans_func(n, n, m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+            trans_func(n, n, -m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+            for p in range(n + 1, max_order + 1):
+                trans_idx += 1
+                sign = -sign
+                # trans_idx <=> trans[n, p, m]
+                trans_func(n, p, m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+                trans_func(n, p, -m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+                trans_func(p, n, m, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+                trans_func(p, n, -m, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)

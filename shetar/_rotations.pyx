@@ -220,7 +220,7 @@ def full_rotation_transform(expansion_data, colatitude_rotation_coefficients, pr
         Py_ssize_t[:] secondary_stride = prepare_strides(secondary_shape, output_shape)
         Py_ssize_t[:] out_stride = prepare_strides(output_shape, output_shape)
         Py_ssize_t exp_elem_idx, colat_elem_idx, prim_elem_idx, second_elem_idx, out_elem_idx
-        Py_ssize_t num_elements = out.shape[0], ndim = out.ndim
+        Py_ssize_t num_elements = out_cy.shape[0], ndim = out.ndim
 
     with nogil:
         for out_elem_idx in range(num_elements):
