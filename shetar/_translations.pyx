@@ -226,24 +226,41 @@ cdef void coaxial_translation_coefficients_calculation(
 
 
 
-def coaxial_translation_transform(expansion_data, coaxial_translation_coefficients, output_order, inverse=False, out=None):
+def coaxial_translation_transform(expansion_data, coaxial_translation_coefficients, input_order, output_order, inverse=False, out=None):
     output_shape, expansion_shape, transform_shape = broadcast_shapes(
         expansion_data.shape[:-1], coaxial_translation_coefficients.shape[:-1]
     )
 
     
-    if coaxial_translation_coefficients.shape[-1] !=  coaxial_order_to_unique(min_order, max_order):
-        raise ValueError(f'Coaxial translation coefficients with {coaxial_translation_coefficients.shape[-1]} unique values does not match specifiend tranfsform orders {min_order, max_order}')
+    if coaxial_translation_coefficients.shape[-1] !=  coaxial_order_to_unique(input_order, output_order):
+        raise ValueError(f'Coaxial translation coefficients with {coaxial_translation_coefficients.shape[-1]} unique values does not match specifiend tranfsform orders {input_order, output_order}')
     expansion_order = int(expansion_data.shape[-1] ** 0.5) - 1
-    output_unique = (output_order + 1)**2
 
+    
     if out is None:
-        out = np.zeros(output_shape + (output_unique,), complex)
+        result_order = output_order
+        out = np.zeros(output_shape + ((result_order + 1)**2,), complex)
     else:
+        result_order = int(out.shape[-1] ** 0.5) - 1
         if out.shape[:-1] != output_shape:
             raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for translation of expansion of shape {expansion_shape} and transform shape {transform_shape}')
-        if out.shape[-1] != output_unique:
-            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for translation of expansion with order {output_order}, requiring {output_unique} unique values')
+
+    # Checks for order.
+    # This will maintain the relation between expantion_order and result_order if they are different,
+    # but truncate them to the allowable order in the transform if needed.
+    # If they are equal, they will be truncated to the input order and output order if needed.
+    min_order = min(input_order, output_order)
+    max_order = max(input_order, output_order)
+    if expansion_order < result_order:
+        expansion_order = min(expansion_order, min_order)
+        result_order = min(result_order, max_order)
+    elif result_order < expansion_order:
+        result_order = min(result_order, min_order)
+        expansion_order = min(expansion_order, max_order)
+    else:
+        # expansion_order == result_order
+        expansion_order = min(expansion_order, input_order)
+        result_order = min(result_order, output_order)
 
     if not np.iscomplexobj(coaxial_translation_coefficients):
         # We need a complex object so that the assignment wont break.
@@ -257,17 +274,22 @@ def coaxial_translation_transform(expansion_data, coaxial_translation_coefficien
         double complex [:, :] exp_cy = expansion_data.reshape((-1, expansion_data.shape[-1]))
         double complex[:, :] trans_cy = coaxial_translation_coefficients.reshape((-1, coaxial_translation_coefficients.shape[-1]))
         translation_implementation trans_func
-        Py_ssize_t min_order = min(output_order, expansion_order)
-        Py_ssize_t max_order = max(output_order, expansion_order)
+        Py_ssize_t N, P, L, U
 
+    L = min_order
+    U = max_order
     if inverse:
         trans_func = inverse_coaxial_implementation
+        N = result_order
+        P = expansion_order
     else:
         trans_func = forward_coaxial_implementation
+        P = result_order
+        N = expansion_order
 
-    if out.size == output_unique:
+    if out.size == out.shape[-1]:
         # No loop over elements
-        coaxial_translation_transform_calculation(out_cy, exp_cy, trans_cy, 0, 0, 0, min_order, max_order, trans_func)
+        coaxial_translation_transform_calculation(out_cy, exp_cy, trans_cy, 0, 0, 0, N, P, L, U, trans_func)
         return out
 
     cdef:
@@ -280,8 +302,8 @@ def coaxial_translation_transform(expansion_data, coaxial_translation_coefficien
     with nogil:
         for out_elem_idx in range(num_elements):
             exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
-            trans_elem_idx = broadcast_index(out_elem_idx, transform_shape, out_stride, ndim)
-            coaxial_translation_transform_calculation(out_cy, exp_cy, trans_cy, out_elem_idx, exp_elem_idx, trans_elem_idx, min_order, max_order, trans_func)
+            trans_elem_idx = broadcast_index(out_elem_idx, trans_stride, out_stride, ndim)
+            coaxial_translation_transform_calculation(out_cy, exp_cy, trans_cy, out_elem_idx, exp_elem_idx, trans_elem_idx, N, P, L, U, trans_func)
 
     return out
 
@@ -351,32 +373,42 @@ cdef void coaxial_translation_transform_calculation(
     Py_ssize_t max_order,
     translation_implementation trans_func,
 ) nogil:
+    N_max = min(N_max, P_max)
     cdef:
         Py_ssize_t trans_idx, n, p, m
         short sign
+        Py_ssize_t N_skip = ((min_order - N_max) * (2 * max_order - min_order - N_max + 1))//2
+        Py_ssize_t P_skip = (max_order - P_max)
     # comments indicate [n, p, m]
     trans_idx = -1
     # deal with m=0, since that removes the -m symmetry
-    for n in range(min_order + 1):
+    for n in range(N_max + 1):
         trans_idx += 1
         sign = 1  # (-1)**(2n)
         # trans_idx <=> trans[n, n, 0]
         trans_func(n, n, 0, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
-        for p in range(n + 1, max_order):
+        for p in range(n + 1, N_max + 1):
             trans_idx += 1
             sign = -sign
             # trans_idx <=> trans[n, p, 0]
             trans_func(n, p, 0, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
             trans_func(p, n, 0, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+        for p in range(N_max + 1, P_max + 1):
+            trans_idx += 1
+            # trans_idx <=> trans[n, p, 0]
+            trans_func(n, p, 0, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+            # The symmetry should not be used here since trans[p, n, 0] would mean indexing with n>N_max (since we have p as the n-index)
+        trans_idx += P_skip
+    trans_idx += N_skip
 
-    for m in range(1, min_order + 1):
-        for n in range(m, min_order + 1):
+    for m in range(1, N_max + 1):
+        for n in range(m, N_max + 1):
             # trans_idx <=> trans[n, n, m]
             trans_idx += 1
             sign = 1  # (-1)**(2n)
             trans_func(n, n, m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
             trans_func(n, n, -m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
-            for p in range(n + 1, max_order + 1):
+            for p in range(n + 1, N_max + 1):
                 trans_idx += 1
                 sign = -sign
                 # trans_idx <=> trans[n, p, m]
@@ -384,3 +416,10 @@ cdef void coaxial_translation_transform_calculation(
                 trans_func(n, p, -m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
                 trans_func(p, n, m, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
                 trans_func(p, n, -m, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+            for p in range(N_max + 1, P_max + 1):
+                trans_idx += 1
+                # trans_idx <=> trans[n, p, m]
+                trans_func(n, p, m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+                trans_func(n, p, -m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+            trans_idx += P_skip
+        trans_idx += N_skip
