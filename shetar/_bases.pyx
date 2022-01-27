@@ -1,4 +1,5 @@
 import numpy as np
+import cython
 cimport cython
 from ._shapes import prepare_strides, broadcast_shapes
 from ._shapes cimport broadcast_index

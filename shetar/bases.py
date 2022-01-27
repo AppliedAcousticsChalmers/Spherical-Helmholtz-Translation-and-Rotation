@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.special
 from . import coordinates
-from . import _bases
+from . import _bases, _shapes
 
 
 def _wrap_indexing(key, func, *args):
@@ -106,7 +106,7 @@ class RadialBaseClass(coordinates.OwnerMixin):
     def __init__(self, order, position=None, radius=None, wavenumber=None, defer_evaluation=False):
         self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, radius=radius)
         self._order = order
-        self._wavenumber = wavenumber
+        self._wavenumber = np.asarray(wavenumber)
         if not defer_evaluation:
             self.evaluate(self.coordinate)
 
@@ -132,7 +132,7 @@ class RadialBaseClass(coordinates.OwnerMixin):
 
     @property
     def shape(self):
-        return self.coordinate.shapes.radius
+        return _shapes.broadcast_shapes(self.coordinate.shapes.radius, self.wavenumber.shape)[0]
 
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)
@@ -239,6 +239,10 @@ class MultipoleBase(coordinates.OwnerMixin):
     @property
     def order(self):
         return self._angular.order
+
+    @property
+    def shape(self):
+        return _shapes.broadcast_shapes(self.coordinate.shape, self.wavenumber.shape)[0]
 
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)

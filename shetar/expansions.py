@@ -1,5 +1,6 @@
 import numpy as np
 from . import coordinates
+from . import _shapes
 
 
 class Expansion:
@@ -9,24 +10,26 @@ class Expansion:
             self._data = data
             if order is not None and self.order != order:
                 raise ValueError(f'Received data of order {self.order} in conflict with specified order {order}')
-            if np.shape(wavenumber) != np.shape(data)[1:(np.ndim(wavenumber) + 1)]:
+            try:
+                _shapes.broadcast_shapes(np.shape(wavenumber), np.shape(data)[:-1])
+            except ValueError:
                 raise ValueError(f'Received wavenumber of shape {np.shape(wavenumber)} in conflict with data of shape {np.shape(data)}')
-            if shape is not None and np.shape(data)[2:] != shape:
+            if shape is not None and np.shape(data)[:-1] != shape:
                 raise ValueError(f'Received explicit shape {shape} in conflict with data of shape {np.shape(data)}')
         elif order is not None:
             shape = tuple() if shape is None else (shape,) if type(shape) is int else tuple(shape)
             num_unique = (order + 1) ** 2
-            self._data = np.zeros((num_unique,) + np.shape(wavenumber) + shape, dtype=complex)
+            self._data = np.zeros(shape + (num_unique,), dtype=complex)
         else:
             raise ValueError('Cannot initialize expansion without either raw data or known order')
 
     @property
     def order(self):
-        return int(np.shape(self._data)[0] ** 0.5) - 1
+        return int(np.shape(self._data)[-1] ** 0.5) - 1
 
     @property
     def shape(self):
-        return np.shape(self._data)[(1 + np.ndim(self._wavenumber)):]
+        return np.shape(self._data)[:-1]
 
     @property
     def ndim(self):

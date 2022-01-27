@@ -1,5 +1,6 @@
 import numpy as np
 import cython
+cimport cython
 
 
 def prepare_strides(input_shape, target_shape):

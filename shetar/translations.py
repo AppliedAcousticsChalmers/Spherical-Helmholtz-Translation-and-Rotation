@@ -1,5 +1,5 @@
 import numpy as np
-from . import coordinates, rotations, expansions, _translations
+from . import coordinates, rotations, expansions, _translations, _shapes
 
 
 class CoaxialTranslation(coordinates.OwnerMixin):
@@ -18,7 +18,7 @@ class CoaxialTranslation(coordinates.OwnerMixin):
             - (self._min_order * (self._min_order + 1)) // 2 * (self._min_order + self._max_order + 2)
             + (self._min_order * (self._min_order - 1) * (self._min_order + 1)) // 6
         )
-        self._data = np.zeros(self.coordinate.shapes.radius + (num_unique,), self._dtype)
+        self._data = np.zeros(self._coaxial_shape + (num_unique,), self._dtype)
 
         if not defer_evaluation:
             self.evaluate(position=self.coordinate)
@@ -37,7 +37,12 @@ class CoaxialTranslation(coordinates.OwnerMixin):
 
     @property
     def shape(self):
-        return self.coordinate.shapes.radius
+        return self._coaxial_shape
+
+    @property
+    def _coaxial_shape(self):
+        # Needed since the full translation will override the .shape
+        return _shapes.broadcast_shapes(self.coordinate.shapes.radius, self.wavenumber.shape)[0]
 
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)
@@ -291,7 +296,7 @@ class Translation(CoaxialTranslation):
 
     @property
     def shape(self):
-        return self.coordinate.shape
+        return _shapes.broadcast_shapes(self.coordinate.shape, self.wavenumber.shape)[0]
 
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)
