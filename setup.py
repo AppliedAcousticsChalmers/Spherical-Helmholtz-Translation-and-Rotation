@@ -47,7 +47,7 @@ with hardcoded() as version:
         license='MIT',
         packages=find_packages('.'),
         ext_modules=ext_modules,
-        python_requires='>=3.6',
+        python_requires='>=3.8',
         install_requires=['numpy', 'scipy'],
         tests_require=['pytest', 'pytest-cov'],
         setup_requires=['pytest-runner'],
