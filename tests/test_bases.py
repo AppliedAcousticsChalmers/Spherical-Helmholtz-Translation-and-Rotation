@@ -14,8 +14,8 @@ def order(request):
 
 
 @pytest.fixture(scope='module', params=[
-    0, np.pi / 2, np.pi, np.linspace(1e-6, 1 - 1e-6, 25) * np.pi,
-    pytest.param(np.random.uniform(low=1e-6, high=1 - 1e-6, size=(7, 11)) * np.pi, marks=pytest.mark.slow)
+    0, np.pi / 2, np.pi, np.linspace(0.1, 0.9, 25) * np.pi,
+    pytest.param(np.random.uniform(low=0.1, high=0.9, size=(7, 11)) * np.pi, marks=pytest.mark.slow)
 ])
 def colatitude(request):
     return request.param
