@@ -54,7 +54,6 @@ def coaxial_translation_interdomain_coefficients(distance, input_order, output_o
         if out.shape[-1] != num_unique:
             raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for coaxial translation coefficients of {input_order = } and {output_order = }, requiring {num_unique} unique values')
 
-
     buffer_shape = min(input_order, output_order) + 1
     x_init = distance.reshape((-1, 1))
     n_init = np.arange(input_order + output_order + 1)
