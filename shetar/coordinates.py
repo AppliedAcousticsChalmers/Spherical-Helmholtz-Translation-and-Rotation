@@ -2,6 +2,7 @@
 
 import numpy as np
 import abc
+from ._shapes import broadcast_shapes
 
 
 class OwnerMixin:
@@ -50,18 +51,6 @@ class Coordinate(abc.ABC):
         return transform.apply(self, *args, **kwargs)
 
     class _ShapeClass(abc.ABC):
-        @staticmethod
-        def broadcast_shapes(*shapes, output='new'):
-            ndim = max(len(s) for s in shapes)
-            padded_shapes = [(1,) * (ndim - len(s)) + s for s in shapes]
-            out_shape = [max(s) for s in zip(*padded_shapes)]
-            if not all([dim == 1 or dim == out_dim for dims, out_dim in zip(zip(*padded_shapes), out_shape) for dim in dims]):
-                raise ValueError(f"Shapes {shapes} cannot be broadcast together")
-            if output == 'new':
-                return tuple(out_shape)
-            elif output == 'reshape':
-                return padded_shapes
-
         def __init__(self, owner):
             self.owner = owner
 
@@ -190,7 +179,7 @@ class SpatialCoordinate(Coordinate):
 
         @property
         def cartesian_mesh(self):
-            return self.broadcast_shapes(self.x, self.y, self.z)
+            return broadcast_shapes(self.x, self.y, self.z)[0]
 
         @property
         @abc.abstractmethod
@@ -209,11 +198,11 @@ class SpatialCoordinate(Coordinate):
 
         @property
         def spherical_mesh(self):
-            return self.broadcast_shapes(self.radius, self.colatitude, self.azimuth)
+            return broadcast_shapes(self.radius, self.colatitude, self.azimuth)[0]
 
         @property
         def angular(self):
-            return self.broadcast_shapes(self.colatitude, self.azimuth)
+            return broadcast_shapes(self.colatitude, self.azimuth)[0]
 
 
 class _CartesianConverter(SpatialCoordinate):
@@ -234,15 +223,15 @@ class _CartesianConverter(SpatialCoordinate):
     class _ShapeClass(SpatialCoordinate._ShapeClass):
         @property
         def radius(self):
-            return self.broadcast_shapes(self.x, self.y, self.z)
+            return broadcast_shapes(self.x, self.y, self.z)[0]
 
         @property
         def colatitude(self):
-            return self.broadcast_shapes(self.radius, self.z)
+            return broadcast_shapes(self.radius, self.z)[0]
 
         @property
         def azimuth(self):
-            return self.broadcast_shapes(self.x, self.y)
+            return broadcast_shapes(self.x, self.y)[0]
 
 
 class _SphericalConverter(SpatialCoordinate):
@@ -261,15 +250,15 @@ class _SphericalConverter(SpatialCoordinate):
     class _ShapeClass(SpatialCoordinate._ShapeClass):
         @property
         def x(self):
-            return self.broadcast_shapes(self.radius, self.colatitude, self.azimuth)
+            return broadcast_shapes(self.radius, self.colatitude, self.azimuth)[0]
 
         @property
         def y(self):
-            return self.broadcast_shapes(self.radius, self.colatitude, self.azimuth)
+            return broadcast_shapes(self.radius, self.colatitude, self.azimuth)[0]
 
         @property
         def z(self):
-            return self.broadcast_shapes(self.radius, self.colatitude)
+            return broadcast_shapes(self.radius, self.colatitude)[0]
 
 
 class Cartesian(_CartesianConverter):
@@ -326,7 +315,7 @@ class Cartesian(_CartesianConverter):
 
         @property
         def shape(self):
-            return self.broadcast_shapes(self.x, self.y, self.z)
+            return broadcast_shapes(self.x, self.y, self.z)[0]
 
 
 class CartesianMesh(_CartesianConverter):
@@ -423,7 +412,7 @@ class Spherical(_SphericalConverter):
 
         @property
         def shape(self):
-            return self.broadcast_shapes(self.radius, self.colatitude, self.azimuth)
+            return broadcast_shapes(self.radius, self.colatitude, self.azimuth)[0]
 
 
 class SphericalMesh(_SphericalConverter):
@@ -566,7 +555,7 @@ class Rotation(Coordinate):
 
         @property
         def shape(self):
-            return self.broadcast_shapes(self.colatitude, self.azimuth, self.secondary_azimuth)
+            return broadcast_shapes(self.colatitude, self.azimuth, self.secondary_azimuth)[0]
 
 
 class Translation(Coordinate):

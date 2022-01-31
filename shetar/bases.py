@@ -1,23 +1,48 @@
 import numpy as np
 import scipy.special
 from . import coordinates
+from . import _bases, _shapes
+
+
+def _wrap_indexing(key, func, *args):
+    try:
+        n, m = key
+        n, m = np.broadcast_arrays(n, m)
+        indices = np.stack([n, m], axis=1)
+    except np.AxisError:
+        return func(*args, [[n, m]])[..., 0]
+    except ValueError:
+        indices = np.asarray(key)
+    if indices.ndim != 2:
+        raise ValueError('Cannot index with multidimentional arrays')
+    return func(*args, indices)
 
 
 class LegendrePolynomials(coordinates.OwnerMixin):
-    def __init__(self, order, position=None, colatitude=None, x=None, normalization='orthonormal', defer_evaluation=False):
+    _evaluate = staticmethod(_bases.legendre_polynomials)
+    _contract = staticmethod(_bases.legendre_contraction)
+
+    def __init__(self, order, position=None, colatitude=None, x=None, defer_evaluation=False):
         if x is not None:
             self.coordinate = coordinates.NonspatialCoordinate(x=x)
         else:
             self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
-        self.normalization = normalization
-        self._data = np.zeros((order + 1,) + self.shape, dtype=float)
+        self._data = np.zeros(self.shape + (self.num_unique(order),), dtype=float)
 
         if not defer_evaluation:
             self.evaluate(self.coordinate)
 
     @property
     def order(self):
-        return self._data.shape[0] - 1
+        return self.num_unique_to_order(self._data.shape[-1])
+
+    @classmethod
+    def num_unique_to_order(cls, num_unique):
+        return num_unique - 1
+
+    @classmethod
+    def num_unique(cls, order):
+        return order + 1
 
     @property
     def shape(self):
@@ -27,162 +52,61 @@ class LegendrePolynomials(coordinates.OwnerMixin):
 
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)
-        new_obj.normalization = self.normalization
-        new_obj._order = self.order
         if deep:
             new_obj._data = self._data.copy()
         else:
             new_obj._data = self._data
 
-        if hasattr(self, '_x'):
-            if deep:
-                new_obj._x = self._x.copy()
-            else:
-                new_obj._x = self._x
         return new_obj
-
-    @property
-    def _x(self):
-        if isinstance(self.coordinate, coordinates.NonspatialCoordinate):
-            return self.coordinate.x
-        if isinstance(self.coordinate, coordinates.SpatialCoordinate):
-            return np.cos(self.coordinate.colatitude)
 
     def evaluate(self, position=None, colatitude=None, x=None):
         if x is not None:
             self.coordinate = coordinates.NonspatialCoordinate(x=x)
         else:
             self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
-        x = self._x
-        self._data[0] = 1 / 2**0.5
-        if self.order > 0:
-            self._data[1] = x * 1.5**0.5
-        for n in range(2, self.order + 1):
-            self._data[n] = (
-                x * self._data[n - 1] / n * ((2 * n + 1) * (2 * n - 1))**0.5
-                - self._data[n - 2] * (n - 1) / n * ((2 * n + 1) / (2 * n - 3))**0.5
-            )
+
+        if isinstance(self.coordinate, coordinates.NonspatialCoordinate):
+            arg = self.coordinate.x
+        elif isinstance(self.coordinate, coordinates.SpatialCoordinate):
+            arg = np.cos(self.coordinate.colatitude)
+        else:
+            raise TypeError(f'Unknown type of coordinate {type(self.coordinate)}')
+
+        self._evaluate(arg, order=self.order, out=self._data)
         return self
 
-    def _normalization_factor(self, order, mode=0):
-        if 'complement' in self.normalization.lower():
-            return 1
-
-        if mode == 0:
-            ortho_norm = 1
-        else:
-            ortho_norm = (1 - self._x**2) ** (abs(mode) / 2)
-
-        if 'orthonormal' in self.normalization.lower():
-            return ortho_norm
-
-        if mode == 0:
-            numer = 2
-            denom = (2 * order + 1)
-        else:
-            numer = 2 * scipy.special.factorial(order + mode)
-            denom = scipy.special.factorial(order - mode) * (2 * order + 1)
-
-        if 'scipy' in self.normalization.lower():
-            return ortho_norm * (numer / denom) ** 0.5
+    def apply(self, expansion):
+        try:
+            expansion_data = expansion._data
+        except AttributeError:
+            expansion_data = np.asarray(expansion)
+        return self._contract(expansion_data, self._data)
 
     def __getitem__(self, key):
-        return self._data[key] * self._normalization_factor(key)
-
-    def apply(self, expansion):
-        value = 0
-        for n in range(self.order + 1):
-            value += self[n] * expansion[n]
-        return value
+        return self._data[..., key]
 
 
 class AssociatedLegendrePolynomials(LegendrePolynomials):
-    def __init__(self, order, position=None, colatitude=None, x=None, normalization='orthonormal', defer_evaluation=False):
-        if x is not None:
-            self.coordinate = coordinates.NonspatialCoordinate(x=x)
-        else:
-            self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
-        self.normalization = normalization
-        num_unique = (order + 1) * (order + 2) // 2
-        self._data = np.zeros((num_unique,) + self.shape, dtype=float)
+    _evaluate = staticmethod(_bases.associated_legendre_polynomials)
+    _contract = staticmethod(_bases.associated_legendre_contraction)
 
-        if not defer_evaluation:
-            self.evaluate(self.coordinate)
+    @classmethod
+    def num_unique_to_order(cls, num_unique):
+        return int((8 * num_unique + 1)**0.5 - 3) // 2
 
-    @property
-    def order(self):
-        return int((8 * self._data.shape[0] + 1)**0.5 - 3) // 2
-
-    def evaluate(self, position=None, colatitude=None, x=None):
-        if x is not None:
-            self.coordinate = coordinates.NonspatialCoordinate(x=x)
-        else:
-            self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude)
-        x = self._x
-        one_minus_x_square = 1 - x**2
-
-        # Access the data directly to bypass the normalization code in the getter.
-        self._data[self._idx(0, 0)] = 2**-0.5
-        for order in range(1, self.order + 1):
-            # Recurrence to higher orders
-            self._data[self._idx(order, order)] = - ((2 * order + 1) / (2 * order))**0.5 * self._data[self._idx(order - 1, order - 1)]
-            # Same recurrence as below, but excluding the mode+2 part explicitly.
-            self._data[self._idx(order, order - 1)] = - (2 * order)**0.5 * self._data[self._idx(order, order)] * x
-            for mode in reversed(range(order - 1)):
-                # Recurrece to lower modes
-                self._data[self._idx(order, mode)] = - (
-                    ((order + mode + 2) * (order - mode - 1) / (order - mode) / (order + mode + 1)) ** 0.5
-                    * self._data[self._idx(order, mode + 2)] * one_minus_x_square
-                    + 2 * (mode + 1) / ((order + mode + 1) * (order - mode))**0.5
-                    * self._data[self._idx(order, mode + 1)] * x
-                )
-        return self
-
-    def _idx(self, order=None, mode=None, index=None):
-        if index is None:
-            # Default mode, getting the linear index from the order and mode
-            if mode < 0:
-                raise IndexError(f'Mode {mode} not stored in {self.__class__.__name__}. Use getter or index the object directly')
-            if order < 0 or order > self.order:
-                raise IndexError(f'Order {order} is out of bounds for {self.__class__.__name__} with max order {self.order}')
-            if mode > order:
-                raise IndexError(f'Mode {mode} is out of bounds for order {order}')
-            return order * (order + 1) // 2 + mode
-        else:
-            order = int((8 * index + 1)**0.5 - 1) // 2
-            mode = index - order * (order + 1) // 2
-            return (order, mode)
-
-    @property
-    def _component_indices(self):
-        out = []
-        for order in range(self.order + 1):
-            for mode in range(order + 1):
-                out.append((order, mode))
-        return out
+    @classmethod
+    def num_unique(cls, order):
+        return (order + 1) * (order + 2) // 2
 
     def __getitem__(self, key):
-        order, mode = key
-        if mode < 0:
-            sign = (-1) ** mode
-        else:
-            sign = 1
-        value = self._data[self._idx(order, abs(mode))]
-        return value * sign * self._normalization_factor(order, mode)
-
-    def apply(self, expansion):
-        value = 0
-        for n in range(self.order + 1):
-            for m in range(-n, n + 1):
-                value += self[n, m] * expansion[n, m]
-        return value
+        return _wrap_indexing(key, _bases.associated_legendre_indexing, self._data)
 
 
-class _RadialBaseClass(coordinates.OwnerMixin):
+class RadialBaseClass(coordinates.OwnerMixin):
     def __init__(self, order, position=None, radius=None, wavenumber=None, defer_evaluation=False):
         self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, radius=radius)
         self._order = order
-        self._wavenumber = wavenumber
+        self._wavenumber = np.asarray(wavenumber)
         if not defer_evaluation:
             self.evaluate(self.coordinate)
 
@@ -191,12 +115,15 @@ class _RadialBaseClass(coordinates.OwnerMixin):
         if wavenumber is not None:
             self._wavenumber = wavenumber
         if self.wavenumber is None:
+            # TODO: this should raise!
             x = self.coordinate.radius
         else:
-            x = self.coordinate.radius * np.reshape(self.wavenumber, np.shape(self.wavenumber) + (1,) * self.ndim)
+            # TODO: I don't think we should auto-broadcast the wavenumber.
+            x = self.coordinate.radius * self.wavenumber
+            # x = self.coordinate.radius * np.reshape(self.wavenumber, np.shape(self.wavenumber) + (1,) * self.ndim)
 
-        order = np.arange(self.order + 1).reshape((-1,) + (1,) * (np.ndim(self.wavenumber) + self.ndim))
-        self._data = self._radial_func(order, x)
+        order = np.arange(self.order + 1)
+        self._data = self._radial_func(order, x[..., None])
         return self
 
     @property
@@ -205,7 +132,7 @@ class _RadialBaseClass(coordinates.OwnerMixin):
 
     @property
     def shape(self):
-        return self.coordinate.shapes.radius
+        return _shapes.broadcast_shapes(self.coordinate.shapes.radius, self.wavenumber.shape)[0]
 
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)
@@ -217,35 +144,37 @@ class _RadialBaseClass(coordinates.OwnerMixin):
             new_obj._data = self._data
         return new_obj
 
-    def __getitem__(self, key):
-        return self._data[key]
-
     @property
     def wavenumber(self):
         return self._wavenumber
 
+    def __getitem__(self, key):
+        return self._data[..., key]
 
-class RegularRadialBase(_RadialBaseClass):
+
+class RegularRadialBase(RadialBaseClass):
     def _radial_func(self, order, x):
         return scipy.special.spherical_jn(order, x, derivative=False)
 
 
-class SingularRadialBase(_RadialBaseClass):
+class SingularRadialBase(RadialBaseClass):
     def _radial_func(self, order, x):
         return scipy.special.spherical_jn(order, x, derivative=False) + 1j * scipy.special.spherical_yn(order, x, derivative=False)
 
 
-class DualRadialBase(_RadialBaseClass):
+class DualRadialBase(RadialBaseClass):
     def _radial_func(self, order, x):
         bessel = scipy.special.spherical_jn(order, x, derivative=False)
         neumann = scipy.special.spherical_yn(order, x, derivative=False)
-        return np.stack([bessel, bessel + 1j * neumann], axis=1)
+        return np.stack([bessel, bessel + 1j * neumann], axis=0)
 
 
 class SphericalHarmonics(coordinates.OwnerMixin):
+    _contract = staticmethod(_bases.spherical_harmonics_contraction)
+
     def __init__(self, order, position=None, colatitude=None, azimuth=None, defer_evaluation=False, *args, **kwargs):
         self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, colatitude=colatitude, azimuth=azimuth)
-        self._legendre = AssociatedLegendrePolynomials(order, position=self.coordinate, normalization='orthonormal', defer_evaluation=True)
+        self._legendre = AssociatedLegendrePolynomials(order, position=self.coordinate, defer_evaluation=True)
         if not defer_evaluation:
             self.evaluate(self.coordinate)
         else:
@@ -260,15 +189,13 @@ class SphericalHarmonics(coordinates.OwnerMixin):
         return self
 
     def apply(self, expansion):
-        value = 0
-        for n in range(self.order + 1):
-            for m in range(-n, n + 1):
-                value += self[n, m] * expansion[n, m]
-        return value
-
-    def __getitem__(self, key):
-        order, mode = key
-        return self._legendre[order, mode] * self._phase ** mode / (2 * np.pi)**0.5
+        try:
+            expansion_data = expansion._data
+        except AttributeError:
+            expansion_data = np.asarray(expansion)
+        legendre_data = self._legendre._data
+        phase_data = self._phase
+        return self._contract(expansion_data, legendre_data, phase_data)
 
     @property
     def order(self):
@@ -287,8 +214,13 @@ class SphericalHarmonics(coordinates.OwnerMixin):
             new_obj._phase = self._phase
         return new_obj
 
+    def __getitem__(self, key):
+        return _wrap_indexing(key, _bases.spherical_harmonics_indexing, self._legendre._data, self._phase)
 
-class SphericalBase(coordinates.OwnerMixin):
+
+class MultipoleBase(coordinates.OwnerMixin):
+    _contract = staticmethod(_bases.multipole_contraction)
+
     def __init__(self, order, position=None, wavenumber=None,
                  radius=None, colatitude=None, azimuth=None, defer_evaluation=False):
         self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth)
@@ -308,6 +240,10 @@ class SphericalBase(coordinates.OwnerMixin):
     def order(self):
         return self._angular.order
 
+    @property
+    def shape(self):
+        return _shapes.broadcast_shapes(self.coordinate.shape, self.wavenumber.shape)[0]
+
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)
         new_obj._angular = self._angular.copy(deep=deep)
@@ -318,41 +254,38 @@ class SphericalBase(coordinates.OwnerMixin):
     def wavenumber(self):
         return self._radial.wavenumber
 
-    def __getitem__(self, key):
-        order, mode = key
-        return self._radial[order] * self._angular[order, mode]
-
     def apply(self, expansion):
+        try:
+            expansion_data = expansion._data
+        except AttributeError:
+            expansion_data = np.asarray(expansion)
+        
         wavenumber = getattr(expansion, 'wavenumber', None)
         if wavenumber is not None:
             if not np.allclose(wavenumber, self.wavenumber):
                 raise ValueError('Cannot apply bases to expansion of different wavenuber')
         else:
-            # An expansion can be defined without a wavenumber, but for the
-            # reshaping below to work properly, `wavenumber` needs to have the
-            # same number of dimentions as `self.wavenumber`.
-            wavenumber = np.reshape(wavenumber, np.ndim(self.wavenumber) * [1])
+            # An expansion can be defined without a wavenumber, which is fine
+            # TODO: test if this could break things
+            wavenumber = self.wavenumber
 
-        ndim = max(self.ndim, expansion.ndim)
-        exp_shape = np.shape(wavenumber) + (ndim - expansion.ndim) * (1,) + expansion.shape
-        self_shape = np.shape(self.wavenumber) + (ndim - self.ndim) * (1,) + self.shape
+        legendre_data = self._angular._legendre._data
+        phase_data = self._angular._phase
+        radial_data = self._radial._data
+        return self._contract(expansion_data, radial_data, legendre_data, phase_data)
 
-        value = 0
-        for n in range(min(self.order, expansion.order) + 1):
-            for m in range(-n, n + 1):
-                value += np.reshape(self[n, m], self_shape) * np.reshape(expansion[n, m], exp_shape)
-        return value
+    def __getitem__(self, key):
+        return _wrap_indexing(key, _bases.multipole_indexing, self._radial._data, self._angular._legendre._data, self._angular._phase)
 
-
-class RegularBase(SphericalBase):
+class RegularBase(MultipoleBase):
     _radial_cls = RegularRadialBase
 
 
-class SingularBase(SphericalBase):
+class SingularBase(MultipoleBase):
     _radial_cls = SingularRadialBase
 
 
-class DualBase(SphericalBase):
+class DualBase(MultipoleBase):
     _radial_cls = DualRadialBase
 
     class _Regular:

@@ -5,4 +5,4 @@ __version__ = _version.__version__
 del _version  # Keeps the namespace clean!
 
 
-from . import rotations, coordinates, translations, bases  # noqa: F401, E402
+from . import coordinates, bases, expansions, transforms  # noqa: F401, E402

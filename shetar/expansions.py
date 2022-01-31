@@ -1,5 +1,6 @@
 import numpy as np
 from . import coordinates
+from . import _shapes
 
 
 class Expansion:
@@ -9,24 +10,26 @@ class Expansion:
             self._data = data
             if order is not None and self.order != order:
                 raise ValueError(f'Received data of order {self.order} in conflict with specified order {order}')
-            if np.shape(wavenumber) != np.shape(data)[1:(np.ndim(wavenumber) + 1)]:
+            try:
+                _shapes.broadcast_shapes(np.shape(wavenumber), np.shape(data)[:-1])
+            except ValueError:
                 raise ValueError(f'Received wavenumber of shape {np.shape(wavenumber)} in conflict with data of shape {np.shape(data)}')
-            if shape is not None and np.shape(data)[2:] != shape:
+            if shape is not None and np.shape(data)[:-1] != shape:
                 raise ValueError(f'Received explicit shape {shape} in conflict with data of shape {np.shape(data)}')
         elif order is not None:
             shape = tuple() if shape is None else (shape,) if type(shape) is int else tuple(shape)
             num_unique = (order + 1) ** 2
-            self._data = np.zeros((num_unique,) + np.shape(wavenumber) + shape, dtype=complex)
+            self._data = np.zeros(shape + (num_unique,), dtype=complex)
         else:
             raise ValueError('Cannot initialize expansion without either raw data or known order')
 
     @property
     def order(self):
-        return int(np.shape(self._data)[0] ** 0.5) - 1
+        return int(np.shape(self._data)[-1] ** 0.5) - 1
 
     @property
     def shape(self):
-        return np.shape(self._data)[(1 + np.ndim(self._wavenumber)):]
+        return np.shape(self._data)[:-1]
 
     @property
     def ndim(self):
@@ -131,7 +134,7 @@ class Expansion:
         return transform.apply(self, *args, **kwargs)
 
     def rotate(self, colatitude=0, azimuth=0, secondary_azimuth=0, new_z_axis=None, old_z_axis=None):
-        from .rotations import Rotation
+        from .tranforms import Rotation
         return Rotation(
             order=self.order, colatitude=colatitude,
             azimuth=azimuth, secondary_azimuth=secondary_azimuth,
@@ -162,7 +165,7 @@ class InteriorExpansion(Expansion):
     from .bases import RegularBase as _base_cls
 
     def translate(self, position=None, order=None, radius=None, colatitude=None, azimuth=None):
-        from .translations import InteriorTranslation
+        from .tranforms import InteriorTranslation
         return InteriorTranslation(
             input_order=self.order, output_order=self.order if order is None else order,
             position=position, radius=radius, colatitude=colatitude, azimuth=azimuth,
@@ -178,9 +181,9 @@ class ExteriorExpansion(Expansion):
 
     def translate(self, order=None, position=None, radius=None, colatitude=None, azimuth=None, domain='exterior'):
         if domain == 'exterior':
-            from .translations import ExteriorTranslation as TranslationCls
+            from .tranforms import ExteriorTranslation as TranslationCls
         elif domain == 'interior':
-            from .translations import ExteriorInteriorTranslation as TranslationCls
+            from .tranforms import ExteriorInteriorTranslation as TranslationCls
         else:
             raise ValueError(f'Unknown domain `{domain}`')
         return TranslationCls(
