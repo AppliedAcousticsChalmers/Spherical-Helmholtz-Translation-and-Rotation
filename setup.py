@@ -38,7 +38,7 @@ with hardcoded() as version:
     setup(
         name='shetar',
         version=version,
-        description='Python implementations of fast multipole methods for the Helmholtz equation',
+        description='Python implementation of translations and rotations for multipole solutions for the Helmholtz equation',
         long_description=open('README.rst', encoding='UTF-8').read(),
         long_description_content_type='text/x-rst',
         url='https://github.com/AppliedAcousticsChalmers/Spherical-Helmholtz-Translation-and-Rotation',

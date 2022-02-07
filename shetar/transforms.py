@@ -1,9 +1,70 @@
+r"""Spatial transforms for expansions.
+
+Spatial transforms are operations that work on expansions to express the same field
+but with a different coordinate system. The can be used in two ways:
+1) To find expansion coefficints of a physical field after undergoing some physical
+transform, e.g. by moving a source.
+2) To find the expansion coefficients of the same physical field but in a different
+mathematical coordinate system, e.g. as measured at a different point in space.
+These wto operations are closely linked, and are often the inverse of each other.
+This means that the expansion coefficients of an "input" expansion after undegoing
+a movement of the field by :math:`\vec x` are the same as the expansion coefficients
+of the same "input" field expanded at a new origin :math:`-\vec x`.
+The default operation here is that of translating the field, e.g. a field created by a
+source at [1, 2, 3] translated by [4, 5, 6] will have the same expansion coefficients
+at the field from the source placed at [5, 7, 9].
+
+The transforms are handled with a number of classes listed below. Rotations are either
+just a colatitude rotation, or a full rotation of the field. Translations are implemented
+along the z-axis only, for lower computational cost. General translations are handled as
+a sequence of rotation->coaxial translation->rotation. For full controll of an arbitrary
+transform, use the rotation and coaxial transslation classes instead of the translation
+classes.
+
+A translation can be done either within a domain, or from the exterior domain to
+the interior domain. Take care to use the correct class to preserve the validity
+of the input expansion at the desired evaluation domain for the output expansion.
+There is often larger errors in the translations near the boundary of the region
+of validity. Take extra care if this region is of interest.
+
+
+.. autosummary::
+    :nosignatures:
+
+    ColatitudeRotation
+    Rotation
+    CoaxialTranslation
+    InteriorCoaxialTranslation
+    ExteriorCoaxialTranslation
+    ExteriorInteriorCoaxialTranslation
+    Translation
+    InteriorTranslation
+    ExteriorTranslation
+    ExteriorInteriorTranslation
+"""
+
 import numpy as np
 from . import coordinates, expansions
 from . import _rotations, _translations, _shapes
 
 
 class ColatitudeRotation(coordinates.OwnerMixin):
+    """Organizes rotations for colatitude directions.
+
+    Parameters
+    ----------
+    order : int
+        The highest order for the rotation.
+        Rotations are performed at constant order, so the order of the input
+        expansion and the output expansion are kept the same.
+    position : optional
+        Position specifier for the rotation, see `shetar.coordinates.Rotation`.
+    colatitude : float, optional
+        Angle in radians by which to rotate.
+    defer_evaluation : bool, optional
+        Do not calculate the values upon initialization of the object.
+    """
+
     _evaluate = staticmethod(_rotations.colatitude_rotation_coefficients)
 
     def __init__(self, order, position=None, colatitude=None, defer_evaluation=False):
@@ -67,7 +128,15 @@ class ColatitudeRotation(coordinates.OwnerMixin):
 
 
 class Rotation(ColatitudeRotation):
-    # Subclass of ColatitudeRotation to get access to the `apply` method, which work the same for both types of rotation.
+    """Organizes arbitrary rotations.
+
+    This handles rotations with both a colatitude and two azimuth parts.
+    For details on how the two azimuth angles interplay with the colatitude angle,
+    refer to the examples.
+
+    See `ColatitudeRotation` and `shetar.coordinates.Rotation` for details on the parameters.
+    """
+
     def __init__(self, order, position=None, colatitude=None, azimuth=None, secondary_azimuth=None, new_z_axis=None, old_z_axis=None, defer_evaluation=False):
         coordinate = coordinates.Rotation.parse_args(
             position=position, new_z_axis=new_z_axis, old_z_axis=old_z_axis,
@@ -112,6 +181,26 @@ class Rotation(ColatitudeRotation):
 
 
 class CoaxialTranslation(coordinates.OwnerMixin):
+    """Patent class for coaxial translations.
+
+    This class should not be instantiated, only inherited from.
+
+    Parameters
+    ----------
+    input_order : int
+        The order or the input expansions.
+    output_order : int
+        The order of the output expansions.
+    position
+        Positioin specifier, see `shetar.coordinates.Translation`.
+    radius : float
+        Distance to translate, see `shetar.coordinates.Translation`.
+    wavenumber : float
+        The wavenumber that the translation operates at.
+    defer_evaluation : bool, optional
+        Do not calculate the values upon initialization of the object.
+    """
+
     _default_output_type = expansions.Expansion
     _transform = staticmethod(_translations.coaxial_translation_transform)
 
@@ -206,6 +295,14 @@ class CoaxialTranslation(coordinates.OwnerMixin):
 
 
 class InteriorCoaxialTranslation(CoaxialTranslation):
+    """Handles translations in the interior domain.
+
+    This applies translations from an interior translation to an interior
+    translation.
+
+    See `CoaxialTranslation` and `shetar.coordinates.Translation` for details on parameters.
+    """
+
     _evaluate = staticmethod(_translations.coaxial_translation_intradomain_coefficients)
     _dtype = float
     from .bases import RegularRadialBase as _recurrence_initialization
@@ -213,6 +310,14 @@ class InteriorCoaxialTranslation(CoaxialTranslation):
 
 
 class ExteriorCoaxialTranslation(CoaxialTranslation):
+    """Handles translations in the exterior domain.
+
+    This applies translations from an exterior translation to an exterior
+    translation.
+
+    See `CoaxialTranslation` and `shetar.coordinates.Translation` for details on parameters.
+    """
+
     _evaluate = staticmethod(_translations.coaxial_translation_intradomain_coefficients)
     _dtype = float
     from .bases import RegularRadialBase as _recurrence_initialization
@@ -220,6 +325,14 @@ class ExteriorCoaxialTranslation(CoaxialTranslation):
 
 
 class ExteriorInteriorCoaxialTranslation(CoaxialTranslation):
+    """Handles translations in the between domains.
+
+    This applies translations from an exterios translation to an interior
+    translation.
+
+    See `CoaxialTranslation` and `shetar.coordinates.Translation` for details on parameters.
+    """
+
     _evaluate = staticmethod(_translations.coaxial_translation_interdomain_coefficients)
     _dtype = complex
     from .bases import SingularRadialBase as _recurrence_initialization
@@ -227,6 +340,13 @@ class ExteriorInteriorCoaxialTranslation(CoaxialTranslation):
 
 
 class Translation(CoaxialTranslation):
+    """Parent class for translations.
+
+    This class should not be instantiated, only inherited from.
+
+    See `shetar.coordinates.Translation` and `CoaxialTranslation` for details on parameters.
+    """
+
     def __init__(self, input_order, output_order, position=None, wavenumber=None,
                  radius=None, colatitude=None, azimuth=None, defer_evaluation=False):
         coordinate = coordinates.Translation.parse_args(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth)
@@ -263,12 +383,30 @@ class Translation(CoaxialTranslation):
 
 
 class InteriorTranslation(Translation, InteriorCoaxialTranslation):
-    pass
+    """Handles translations in the interior domain.
+
+    This applies translations from an interior translation to an interior
+    translation.
+
+    See `CoaxialTranslation` and `shetar.coordinates.Translation` for details on parameters.
+    """
 
 
 class ExteriorTranslation(Translation, ExteriorCoaxialTranslation):
-    pass
+    """Handles translations in the exterior domain.
+
+    This applies translations from an exterior translation to an exterior
+    translation.
+
+    See `CoaxialTranslation` and `shetar.coordinates.Translation` for details on parameters.
+    """
 
 
 class ExteriorInteriorTranslation(Translation, ExteriorInteriorCoaxialTranslation):
-    pass
+    """Handles translations in the between domains.
+
+    This applies translations from an exterios translation to an interior
+    translation.
+
+    See `CoaxialTranslation` and `shetar.coordinates.Translation` for details on parameters.
+    """

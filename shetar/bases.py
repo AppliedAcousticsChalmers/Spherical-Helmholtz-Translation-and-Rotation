@@ -1,3 +1,26 @@
+"""Base functions used in spherical coordinates.
+
+This module contains classes used to calculate and organize the required base
+functions for the Helmholtz equation in spherical coordinates.
+Theese can be used to reuse the calculation of base functions for repeated
+evaluation of some expansion coefficients at specific points in space.
+
+
+.. autosummary::
+    :nosignatures:
+
+    LegendrePolynomials
+    AssociatedLegendrePolynomials
+    RegularRadialBase
+    SingularRadialBase
+    DualRadialBase
+    SphericalHarmonics
+    RegularBase
+    SingularBase
+    DualBase
+
+"""
+
 import numpy as np
 import scipy.special
 from . import coordinates
@@ -19,6 +42,23 @@ def _wrap_indexing(key, func, *args):
 
 
 class LegendrePolynomials(coordinates.OwnerMixin):
+    """Order only Legendre polynomials.
+
+    Parameters
+    ----------
+        order : int
+            The highest order included for the base.
+        position : None, optional
+            Position specifier, see `coordinates` for more info.
+        colatitude : None, optional
+            Colatitude of a spatial posiition. Will be used as cos(colatitude)
+            as the input to the base function.
+        x : None, optional
+            Arbitrary input directly to the base function.
+        defer_evaluation : bool, optional
+            Do not calculate the values upon initialization of the object.
+    """
+
     _evaluate = staticmethod(_bases.legendre_polynomials)
     _contract = staticmethod(_bases.legendre_contraction)
 
@@ -87,6 +127,14 @@ class LegendrePolynomials(coordinates.OwnerMixin):
 
 
 class AssociatedLegendrePolynomials(LegendrePolynomials):
+    """Associated Legendre polynomials with both order and mode.
+
+    Note that this is using an orthonormal definition of the basis functions,
+    i.e. not the one traditionally found in textbooks.
+
+    See `LegendrePolynomials` for details on parameters.
+    """
+
     _evaluate = staticmethod(_bases.associated_legendre_polynomials)
     _contract = staticmethod(_bases.associated_legendre_contraction)
 
@@ -103,6 +151,24 @@ class AssociatedLegendrePolynomials(LegendrePolynomials):
 
 
 class RadialBaseClass(coordinates.OwnerMixin):
+    """Parent class for all radial bases.
+
+    This class should not be instantiated, only inherited from.
+
+    Parameters
+    ----------
+    order : int
+        The highest order incuded for the base.
+    position : None, optional
+        Position specifier, see `coordinates` for more info.
+    radius : None, optional
+        Radius where the base is evaluated, in meters.
+    wavenumber : None, optional
+        Wavenumber where the base is evaluated, in rad/m.
+    defer_evaluation : bool, optional
+        Do not calculate the values upon initialization of the object.
+    """
+
     def __init__(self, order, position=None, radius=None, wavenumber=None, defer_evaluation=False):
         self.coordinate = coordinates.SpatialCoordinate.parse_args(position=position, radius=radius)
         self._order = order
@@ -153,16 +219,33 @@ class RadialBaseClass(coordinates.OwnerMixin):
 
 
 class RegularRadialBase(RadialBaseClass):
+    """Regular radial base, for interior problems.
+
+    This is also known as the spherical Bessel function.
+    See `RadialBaseClass` for details on the parameters.
+    """
+
     def _radial_func(self, order, x):
         return scipy.special.spherical_jn(order, x, derivative=False)
 
 
 class SingularRadialBase(RadialBaseClass):
+    """Singular radial base, for exterior problems.
+
+    This is also known as the spherical Hankel function.
+    See `RadialBaseClass` for details on the parameters.
+    """
+
     def _radial_func(self, order, x):
         return scipy.special.spherical_jn(order, x, derivative=False) + 1j * scipy.special.spherical_yn(order, x, derivative=False)
 
 
 class DualRadialBase(RadialBaseClass):
+    """Dual radial base, for interior and problems.
+
+    This calculates both the regualr and singular radial base functions.
+    See `RadialBaseClass` for details on the parameters.
+    """
     def _radial_func(self, order, x):
         bessel = scipy.special.spherical_jn(order, x, derivative=False)
         neumann = scipy.special.spherical_yn(order, x, derivative=False)
@@ -170,6 +253,25 @@ class DualRadialBase(RadialBaseClass):
 
 
 class SphericalHarmonics(coordinates.OwnerMixin):
+    """Spherical harmonics.
+
+    This evaluate the (surface) spherical harmonics. The values are with the same
+    phase and scaling conventions as e.g. scipy.
+
+    Parameters
+    ----------
+    order : int
+        The highest order incuded for the base.
+    position : None, optional
+        Position specifier, see `coordinates` for more info.
+    colatitude : None, optional
+        Colatitude angle where to evaluate the spherical harmonics, in [0, π].
+    azimuth : None, optional
+        Azimuth angle where to evaluate the spherical harmonics, in radians.
+    defer_evaluation : bool, optional
+        Do not calculate the values upon initialization of the object.
+    """
+
     _contract = staticmethod(_bases.spherical_harmonics_contraction)
 
     def __init__(self, order, position=None, colatitude=None, azimuth=None, defer_evaluation=False, *args, **kwargs):
@@ -219,6 +321,28 @@ class SphericalHarmonics(coordinates.OwnerMixin):
 
 
 class MultipoleBase(coordinates.OwnerMixin):
+    """Parent class for all multipole bases.
+
+    This class should not be instantiated, only inherited from.
+
+    Parameters
+    ----------
+    order : int
+        The highest order incuded for the base.
+    position : None, optional
+        Position specifier, see `coordinates` for more info.
+    wavenumber : None, optional
+        Wavenumber where the base is evaluated, in rad/m.
+    radius : None, optional
+        Radius where the base is evaluated, in meters.
+    colatitude : None, optional
+        Colatitude angle where to evaluate the spherical harmonics, in [0, π].
+    azimuth : None, optional
+        Azimuth angle where to evaluate the spherical harmonics, in radians.
+    defer_evaluation : bool, optional
+        Do not calculate the values upon initialization of the object.
+    """
+
     _contract = staticmethod(_bases.multipole_contraction)
 
     def __init__(self, order, position=None, wavenumber=None,
@@ -278,14 +402,30 @@ class MultipoleBase(coordinates.OwnerMixin):
         return _wrap_indexing(key, _bases.multipole_indexing, self._radial._data, self._angular._legendre._data, self._angular._phase)
 
 class RegularBase(MultipoleBase):
+    """Regular multipole base, for interior problems.
+
+    See `MultipoleBase` for details on the parameters.
+    """
+
     _radial_cls = RegularRadialBase
 
 
 class SingularBase(MultipoleBase):
+    """Singular multipole base, for exterior problems.
+
+    See `MultipoleBase` for details on the parameters.
+    """
+
     _radial_cls = SingularRadialBase
 
 
 class DualBase(MultipoleBase):
+    """Dual multipole base, for interior and exterior problems.
+
+    This calculates both the singular and regular multipole bases.
+    See `MultipoleBase` for details on the parameters.
+    """
+
     _radial_cls = DualRadialBase
 
     class _Regular:
