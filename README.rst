@@ -1,4 +1,4 @@
-Spherical-Helmholtz-Translation-and-Rotation
+Spherical Helmholtz Translation and Rotation
 ============================================
 .. image:: https://github.com/AppliedAcousticsChalmers/Spherical-Helmholtz-Translation-and-Rotation/workflows/Tests/badge.svg
     :target: https://github.com/AppliedAcousticsChalmers/Spherical-Helmholtz-Translation-and-Rotation/actions?query=workflow%3ATests
