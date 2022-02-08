@@ -1,7 +1,11 @@
 version: 2
 formats: all
+
+build:
+  tools:
+    python: "3.9"
+
 python:
-  version: 3
   install:
     - requirements: requirements.txt
     - requirements: docs/requirements.txt
