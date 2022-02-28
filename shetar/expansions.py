@@ -183,7 +183,7 @@ class Expansion:
         return transform.apply(self, *args, **kwargs)
 
     def rotate(self, colatitude=0, azimuth=0, secondary_azimuth=0, new_z_axis=None, old_z_axis=None):
-        from .tranforms import Rotation
+        from .transforms import Rotation
         return Rotation(
             order=self.order, colatitude=colatitude,
             azimuth=azimuth, secondary_azimuth=secondary_azimuth,
@@ -234,7 +234,7 @@ class InteriorExpansion(Expansion):
     from .bases import RegularBase as _base_cls
 
     def translate(self, position=None, order=None, radius=None, colatitude=None, azimuth=None):
-        from .tranforms import InteriorTranslation
+        from .transforms import InteriorTranslation
         return InteriorTranslation(
             input_order=self.order, output_order=self.order if order is None else order,
             position=position, radius=radius, colatitude=colatitude, azimuth=azimuth,
@@ -261,9 +261,9 @@ class ExteriorExpansion(Expansion):
 
     def translate(self, order=None, position=None, radius=None, colatitude=None, azimuth=None, domain='exterior'):
         if domain == 'exterior':
-            from .tranforms import ExteriorTranslation as TranslationCls
+            from .transforms import ExteriorTranslation as TranslationCls
         elif domain == 'interior':
-            from .tranforms import ExteriorInteriorTranslation as TranslationCls
+            from .transforms import ExteriorInteriorTranslation as TranslationCls
         else:
             raise ValueError(f'Unknown domain `{domain}`')
         return TranslationCls(
