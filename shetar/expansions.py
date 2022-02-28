@@ -123,11 +123,11 @@ class Expansion:
 
     def __getitem__(self, key):
         n, m, = key
-        return self._data[self._idx(n, m)]
+        return self._data[..., self._idx(n, m)]
 
     def __setitem__(self, key, value):
         n, m, = key
-        self._data[self._idx(n, m)] = value
+        self._data[..., self._idx(n, m)] = value
 
     def _compatible_with(self, other):
         # TODO: Raise meaningful exceptions when the objects are not compatible.
