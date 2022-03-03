@@ -372,42 +372,50 @@ cdef void coaxial_translation_transform_calculation(
     Py_ssize_t max_order,
     translation_implementation trans_func,
 ) nogil:
-    N_max = min(N_max, P_max)
     cdef:
         Py_ssize_t trans_idx, n, p, m
         short sign
-        Py_ssize_t N_skip = ((min_order - N_max) * (2 * max_order - min_order - N_max + 1))//2
-        Py_ssize_t P_skip = (max_order - P_max)
+        Py_ssize_t NP_min = min(N_max, P_max)
+        Py_ssize_t NP_max = max(N_max, P_max)
+        Py_ssize_t N_skip = ((min_order - NP_min) * (2 * max_order - min_order - NP_min + 1))//2
+        Py_ssize_t P_skip = (max_order - NP_max)
     # comments indicate [n, p, m]
     trans_idx = -1
     # deal with m=0, since that removes the -m symmetry
-    for n in range(N_max + 1):
+    for n in range(NP_min + 1):
         trans_idx += 1
         sign = 1  # (-1)**(2n)
         # trans_idx <=> trans[n, n, 0]
         trans_func(n, n, 0, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
-        for p in range(n + 1, N_max + 1):
+        for p in range(n + 1, NP_min + 1):
             trans_idx += 1
             sign = -sign
             # trans_idx <=> trans[n, p, 0]
             trans_func(n, p, 0, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
             trans_func(p, n, 0, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
-        for p in range(N_max + 1, P_max + 1):
+        # Only one of the below loops will run. The one which runs is determined by which of N and P is the largest.
+        # If P is the largest, the coefficent is stored.
+        # If N is the largest, we use the symmetry.
+        for p in range(NP_min + 1, P_max + 1):
             trans_idx += 1
             # trans_idx <=> trans[n, p, 0]
             trans_func(n, p, 0, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
-            # The symmetry should not be used here since trans[p, n, 0] would mean indexing with n>N_max (since we have p as the n-index)
+        for p in range(NP_min + 1, N_max + 1):
+            trans_idx += 1
+            sign = -sign
+            # trans_idx <=> trans[n, p, 0]
+            trans_func(p, n, 0, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
         trans_idx += P_skip
     trans_idx += N_skip
 
-    for m in range(1, N_max + 1):
-        for n in range(m, N_max + 1):
+    for m in range(1, NP_min + 1):
+        for n in range(m, NP_min + 1):
             # trans_idx <=> trans[n, n, m]
             trans_idx += 1
             sign = 1  # (-1)**(2n)
             trans_func(n, n, m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
             trans_func(n, n, -m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
-            for p in range(n + 1, N_max + 1):
+            for p in range(n + 1, NP_min + 1):
                 trans_idx += 1
                 sign = -sign
                 # trans_idx <=> trans[n, p, m]
@@ -415,10 +423,16 @@ cdef void coaxial_translation_transform_calculation(
                 trans_func(n, p, -m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
                 trans_func(p, n, m, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
                 trans_func(p, n, -m, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
-            for p in range(N_max + 1, P_max + 1):
+            for p in range(NP_min + 1, P_max + 1):
                 trans_idx += 1
                 # trans_idx <=> trans[n, p, m]
                 trans_func(n, p, m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
                 trans_func(n, p, -m, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+            for p in range(NP_min + 1, N_max + 1):
+                trans_idx += 1
+                sign = -sign
+                # trans_idx <=> trans[n, p, m]
+                trans_func(p, n, m, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
+                trans_func(p, n, -m, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
             trans_idx += P_skip
         trans_idx += N_skip
