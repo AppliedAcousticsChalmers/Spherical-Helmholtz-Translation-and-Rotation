@@ -4,7 +4,7 @@ This provides convenience classes for storing expansion coefficients with
 the cirrect indexing conventions for the package. There's also a few
 functions which can create some commonly used expansions, e.g. monopoles
 or plane waves.
-The classes with an explicit domain also has methods to conviniently evaluate
+The classes with an explicit domain also has methods to conveniently evaluate
 the expansion at some positions in space, or to apply certain transforms.
 
 .. autosummary::
@@ -31,7 +31,7 @@ class Expansion:
 
     This can be used as a plain holder for the coefficients which has both order
     and mode, e.g. spherical harmonics expansion coefficients. Instances of this
-    class has no inherent notion of whas is the correct base to use, so it
+    class has no inherent notion of what is the correct base to use, so it
     cannot create them automatically.
 
     Parameters
@@ -46,7 +46,7 @@ class Expansion:
         Raw data for expansion coefficients.
         Has to have the correct indexing conventions with the coefficient axis last.
     wavenumber : None, optional
-        Optionial wavenumber of the expansion.
+        Optional wavenumber of the expansion.
         This has to be broadcastable with the spatial shape of the data.
     shape : None, optional
         Spatial shape for all-zero expansions.
@@ -294,7 +294,7 @@ def plane_wave(order, strength=1, colatitude=None, azimuth=None, wavenumber=None
     order : int
         The highest order included in the expansion.
     strength : numerical, default 1
-        The strength of the souource, :math:`q` in the above definition.
+        The strength of the source, :math:`q` in the above definition.
     colatitude : None, optional
         Colatitude propagation angle of the wave.
     azimuth : None, optional
@@ -302,7 +302,7 @@ def plane_wave(order, strength=1, colatitude=None, azimuth=None, wavenumber=None
     wavenumber : None, optional
         Wavenumber of the propagating wave, :math:`k` in the above definition.
     wavevector : None, optional
-        Wavevector, i.e. both wavenuber and propagation direction for the wave.
+        Wavevector, i.e. both wavenumber and propagation direction for the wave.
         This will override the separate parameters if given.
 
     Returns
@@ -328,16 +328,16 @@ def monopole(strength=1, order=0, wavenumber=1, position=None, domain='exterior'
 
     .. math:: \frac{q}{4 \pi r} \exp{(ikr)}
 
-    where :math:`r` is the distance beterrn the souorce and the evaluation position.
+    where :math:`r` is the distance between the source and the evaluation position.
 
 
     Parameters
     ----------
     strength : numerical, default 1
-        Strength or the souorce, :math:`q` in ithe above definition.
+        Strength or the source, :math:`q` in the above definition.
     order : int, default 0
         This can be used to return higher orders than needed for untranslated
-        expansioins, or to controll the output order of the translation.
+        expansions, or to controll the output order of the translation.
     wavenumber : numerical, default 1
         The wavenumber of the source, :math:`k` in the above definition.
     position : None, optional
@@ -376,7 +376,7 @@ def circular_ring(
         position=None, domain='exterior', source_order=None):
     r"""Create a circular ring source expansion.
 
-    The returns the expansioni coefficients corresponding to a circular ring.
+    The returns the expansion coefficients corresponding to a circular ring.
     In the far-field, this has the directivity
 
     .. math:: \frac{q}{4\pi} J_0(ka\sin\theta) \exp{ikr}
@@ -394,7 +394,7 @@ def circular_ring(
     radius : float
         The effective radius of the source, :math:`a` in the above definition.
     strength : numerical, default 1
-        Strength of the source, :math:`q` in the abive definition.
+        Strength of the source, :math:`q` in the above definition.
     colatitude : None, optional
         Colatitude angle of the normal of the source.
     azimuth : None, optional
@@ -402,7 +402,7 @@ def circular_ring(
     wavenumber : float, optional
         Wavenumber if the sound field, :math:`k` in the above definition.
     wavevector : None, optional
-        Wavevector, i.e. both wavenuber and propagation direction for the wave.
+        Wavevector, i.e. both wavenumber and propagation direction for the wave.
         This will override the separate parameters if given.
     position : None, optional
         Position specifier for translation, see `coordinates` for more info.

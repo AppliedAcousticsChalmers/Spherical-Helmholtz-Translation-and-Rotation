@@ -51,7 +51,7 @@ class LegendrePolynomials(coordinates.OwnerMixin):
         position : None, optional
             Position specifier, see `coordinates` for more info.
         colatitude : None, optional
-            Colatitude of a spatial posiition. Will be used as cos(colatitude)
+            Colatitude of a spatial position. Will be used as cos(colatitude)
             as the input to the base function.
         x : None, optional
             Arbitrary input directly to the base function.
@@ -158,7 +158,7 @@ class RadialBaseClass(coordinates.OwnerMixin):
     Parameters
     ----------
     order : int
-        The highest order incuded for the base.
+        The highest order included for the base.
     position : None, optional
         Position specifier, see `coordinates` for more info.
     radius : None, optional
@@ -243,7 +243,7 @@ class SingularRadialBase(RadialBaseClass):
 class DualRadialBase(RadialBaseClass):
     """Dual radial base, for interior and problems.
 
-    This calculates both the regualr and singular radial base functions.
+    This calculates both the regular and singular radial base functions.
     See `RadialBaseClass` for details on the parameters.
     """
     def _radial_func(self, order, x):
@@ -261,7 +261,7 @@ class SphericalHarmonics(coordinates.OwnerMixin):
     Parameters
     ----------
     order : int
-        The highest order incuded for the base.
+        The highest order included for the base.
     position : None, optional
         Position specifier, see `coordinates` for more info.
     colatitude : None, optional
@@ -328,7 +328,7 @@ class MultipoleBase(coordinates.OwnerMixin):
     Parameters
     ----------
     order : int
-        The highest order incuded for the base.
+        The highest order included for the base.
     position : None, optional
         Position specifier, see `coordinates` for more info.
     wavenumber : None, optional
@@ -383,11 +383,11 @@ class MultipoleBase(coordinates.OwnerMixin):
             expansion_data = expansion._data
         except AttributeError:
             expansion_data = np.asarray(expansion)
-        
+
         wavenumber = getattr(expansion, 'wavenumber', None)
         if wavenumber is not None:
             if not np.allclose(wavenumber, self.wavenumber):
-                raise ValueError('Cannot apply bases to expansion of different wavenuber')
+                raise ValueError('Cannot apply bases to expansion of different wavenumber')
         else:
             # An expansion can be defined without a wavenumber, which is fine
             # TODO: test if this could break things
@@ -400,6 +400,7 @@ class MultipoleBase(coordinates.OwnerMixin):
 
     def __getitem__(self, key):
         return _wrap_indexing(key, _bases.multipole_indexing, self._radial._data, self._angular._legendre._data, self._angular._phase)
+
 
 class RegularBase(MultipoleBase):
     """Regular multipole base, for interior problems.

@@ -522,7 +522,7 @@ class Rotation(Coordinate):
         coordinate = SpatialCoordinate.parse_args(position=position, **kwargs)
         # As a result of that the mesh is of shape (..., 3), we have to do the matrix multiplication
         # from the right. The "normal" way is to do it from the left. This means that we have to
-        # transpose the matrix to apply it in the forward way. Since a rotation matix is orthogonal, the
+        # transpose the matrix to apply it in the forward way. Since a rotation matrix is orthogonal, the
         # inverse rotation is described by the tranpose of the rotation matrix, which in this case ends up
         # as the rotation matrix, since we apply it from the right.
         if inverse:

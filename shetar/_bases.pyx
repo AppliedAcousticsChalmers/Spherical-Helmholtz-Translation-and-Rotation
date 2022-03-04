@@ -19,7 +19,7 @@ cdef inline Py_ssize_t spherical_expansion_index(Py_ssize_t order, Py_ssize_t mo
 def associated_legendre_indexing(base_data, indices):
     indices = np.asarray(indices).astype(int)
     out = np.zeros(base_data.shape[:-1] + (indices.shape[0],), float)
-    
+
     for out_idx, (n, m) in enumerate(indices):
         base_idx = associated_legendre_index(n, abs(m))
         if m < 0:
@@ -144,7 +144,7 @@ cdef void associated_legendre_polynomials_calculation(
         # Recurrence to higher orders
         idx_assign = associated_legendre_index(n, n)
         idx_m1 = associated_legendre_index(n - 1, n - 1)
-        fact_m1 = - (<double>(2 * n + 1) / (2 * n))**0.5        
+        fact_m1 = - (<double>(2 * n + 1) / (2 * n))**0.5
         data[idx_elem, idx_assign] = fact_m1 * data[idx_elem, idx_m1]
 
     for n in range(1, N + 1):
@@ -158,7 +158,7 @@ cdef void associated_legendre_polynomials_calculation(
         data[idx_elem, idx_assign] = fact_m1 * data[idx_elem, idx_m1] * x[idx_elem]
 
         for m in range(n - 2, -1, -1):  # [n - 2, n - 3, ... 0]
-            # Recurrece to lower modes
+            # Recurrence to lower modes
             idx_assign = associated_legendre_index(n, m)
             idx_m1 = associated_legendre_index(n, m + 1)
             idx_m2 = associated_legendre_index(n, m + 2)
@@ -441,7 +441,7 @@ def multipole_contraction(expansion_data, radial_data, legendre_data, phase_data
             phase_elem_idx = broadcast_index(out_elem_idx, phase_stride, out_stride, ndim)
             radial_elem_idx = broadcast_index(out_elem_idx, radial_stride, out_stride, ndim)
             multipole_contraction_calculation(
-                out_cy, exp_cy, radial_cy, legendre_cy, phase_cy, 
+                out_cy, exp_cy, radial_cy, legendre_cy, phase_cy,
                 out_elem_idx, exp_elem_idx, radial_elem_idx, legendre_elem_idx, phase_elem_idx, N
             )
 
@@ -454,12 +454,12 @@ def multipole_contraction(expansion_data, radial_data, legendre_data, phase_data
 @cython.wraparound(False)
 cdef void multipole_contraction_calculation(
     double complex[:] output,
-    double complex[:, :] expansion_data, 
+    double complex[:, :] expansion_data,
     double complex[:, :] radial_data,
     double[:, :] legendre_data,
     double complex[:] phase_data,
     Py_ssize_t out_elem_idx,
-    Py_ssize_t exp_elem_idx, 
+    Py_ssize_t exp_elem_idx,
     Py_ssize_t radial_elem_idx,
     Py_ssize_t legendre_elem_idx,
     Py_ssize_t phase_elem_idx,

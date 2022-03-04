@@ -217,15 +217,13 @@ cdef void coaxial_translation_coefficients_calculation(
                 )
 
 
-
-
 def coaxial_translation_transform(expansion_data, coaxial_translation_coefficients, Py_ssize_t low_order, Py_ssize_t high_order, inverse=False, out=None):
     output_shape, expansion_shape, transform_shape = broadcast_shapes(
         expansion_data.shape[:-1], coaxial_translation_coefficients.shape[:-1]
     )
 
     if coaxial_translation_coefficients.shape[-1] !=  coaxial_order_to_unique(low_order, high_order):
-        raise ValueError(f'Coaxial translation coefficients with {coaxial_translation_coefficients.shape[-1]} unique values does not match specifiend tranfsform orders {low_order, high_order}')
+        raise ValueError(f'Coaxial translation coefficients with {coaxial_translation_coefficients.shape[-1]} unique values does not match specified transform orders {low_order, high_order}')
     expansion_order = int(expansion_data.shape[-1] ** 0.5) - 1
 
     if out is None:
@@ -237,7 +235,7 @@ def coaxial_translation_transform(expansion_data, coaxial_translation_coefficien
             raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for translation of expansion of shape {expansion_shape} and transform shape {transform_shape}')
 
     # Checks for order.
-    # This will maintain the relation between expantion_order and result_order if they are different,
+    # This will maintain the relation between expansion_order and result_order if they are different,
     # but truncate them to the allowable order in the transform if needed.
     # If they are equal, they will be truncated to the low order if needed.
     if expansion_order < result_order:
@@ -248,7 +246,7 @@ def coaxial_translation_transform(expansion_data, coaxial_translation_coefficien
         expansion_order = min(expansion_order, high_order)
     else:
         # expansion_order == result_order
-        # If the input/output both are higher than the low order, we cannot possiby guess which of the two should be keps as the high one, so we truncate both of them instead.
+        # If the input/output both are higher than the low order, we cannot possibly guess which of the two should be kept as the high one, so we truncate both of them instead.
         expansion_order = min(expansion_order, low_order)
         result_order = min(result_order, low_order)
 
@@ -256,7 +254,7 @@ def coaxial_translation_transform(expansion_data, coaxial_translation_coefficien
         # We need a complex object so that the assignment wont break.
         # This will use a bit extra memory while running, but probably not extra
         # cpu since the doubles will always be promoted to complex in the calculation anyhow,
-        # seing how they are always multiplied with other complex values.
+        # seeing how they are always multiplied with other complex values.
         coaxial_translation_coefficients = coaxial_translation_coefficients + 0j
 
     cdef:
@@ -344,7 +342,6 @@ cdef void inverse_coaxial_implementation(
     output[out_elem_idx, out_idx] = output[out_elem_idx, out_idx] + expansion[exp_elem_idx, exp_idx] * transform
 
 
-
 @cython.boundscheck(False)
 @cython.cdivision(True)
 @cython.wraparound(False)
@@ -383,7 +380,7 @@ cdef void coaxial_translation_transform_calculation(
             trans_func(n, p, 0, output, expansion, transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
             trans_func(p, n, 0, output, expansion, sign * transform[trans_elem_idx, trans_idx], out_elem_idx, exp_elem_idx)
         # Only one of the below loops will run. The one which runs is determined by which of N and P is the largest.
-        # If P is the largest, the coefficent is stored.
+        # If P is the largest, the coefficient is stored.
         # If N is the largest, we use the symmetry.
         for p in range(NP_min + 1, P_max + 1):
             trans_idx += 1

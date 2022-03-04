@@ -2,12 +2,12 @@ r"""Spatial transforms for expansions.
 
 Spatial transforms are operations that work on expansions to express the same field
 but with a different coordinate system. The can be used in two ways:
-1) To find expansion coefficints of a physical field after undergoing some physical
+1) To find expansion coefficients of a physical field after undergoing some physical
 transform, e.g. by moving a source.
 2) To find the expansion coefficients of the same physical field but in a different
 mathematical coordinate system, e.g. as measured at a different point in space.
 These wto operations are closely linked, and are often the inverse of each other.
-This means that the expansion coefficients of an "input" expansion after undegoing
+This means that the expansion coefficients of an "input" expansion after undergoing
 a movement of the field by :math:`\vec x` are the same as the expansion coefficients
 of the same "input" field expanded at a new origin :math:`-\vec x`.
 The default operation here is that of translating the field, e.g. a field created by a
@@ -150,7 +150,7 @@ class Rotation(ColatitudeRotation):
         if (position is None) and (new_z_axis is None) and (old_z_axis is None) and (colatitude is None):
             # Allows chaing the azimuth angles without reevaluating the colatitude rotation.
             # This might be useful sometimes since changing the azimuth angles is much cheaper than
-            # changing the colatitude angle. If we anyhow change the colatitude roration, reevaluating the
+            # changing the colatitude angle. If we anyhow change the colatitude rotation, reevaluating the
             # azimuth rotations will be very cheap so we won't bother with checking if we could skip it.
             if azimuth is not None:
                 self._primary_phase = np.asarray(np.exp(1j * azimuth))
@@ -192,7 +192,7 @@ class CoaxialTranslation(coordinates.OwnerMixin):
         If given as a single value, it is used for both orders.
         If given as two values, a mixed order translation is evaluated.
     position
-        Positioin specifier, see `shetar.coordinates.Translation`.
+        Position specifier, see `shetar.coordinates.Translation`.
     radius : float
         Distance to translate, see `shetar.coordinates.Translation`.
     wavenumber : float
@@ -281,7 +281,7 @@ class CoaxialTranslation(coordinates.OwnerMixin):
         if out is None:
             out_data = None
         elif out is expansion:
-            raise NotImplementedError('Rotations cannot currently be applied in place')
+            raise NotImplementedError('Translations cannot currently be applied in place')
         else:
             if isinstance(out, expansions.Expansion):
                 out_data = out._data
@@ -332,7 +332,7 @@ class ExteriorCoaxialTranslation(CoaxialTranslation):
 class ExteriorInteriorCoaxialTranslation(CoaxialTranslation):
     """Handles translations in the between domains.
 
-    This applies translations from an exterios translation to an interior
+    This applies translations from an exterior translation to an interior
     translation.
 
     See `CoaxialTranslation` and `shetar.coordinates.Translation` for details on parameters.
@@ -413,7 +413,7 @@ class ExteriorTranslation(Translation, ExteriorCoaxialTranslation):
 class ExteriorInteriorTranslation(Translation, ExteriorInteriorCoaxialTranslation):
     """Handles translations in the between domains.
 
-    This applies translations from an exterios translation to an interior
+    This applies translations from an exterior translation to an interior
     translation.
 
     See `CoaxialTranslation` and `shetar.coordinates.Translation` for details on parameters.

@@ -53,7 +53,7 @@ def colatitude_rotation_coefficients(colatitude, order=None, out=None):
         out[..., 2] = (1 - cosine_colatitude) * 0.5
         # n=1, p=1, m=0 special case
         out[..., 3] = sine_colatitude * 2**-0.5
-        # n=1, p=1, m=1 
+        # n=1, p=1, m=1
         out[..., 4] = (1 + cosine_colatitude) * 0.5
 
     cdef:
@@ -313,7 +313,7 @@ cdef inline void rotation_forward_impl(
     cdef Py_ssize_t out_idx = spherical_expansion_index(n, m)
     cdef Py_ssize_t exp_idx = spherical_expansion_index(n, p)
     output[out_elem_idx, out_idx] = output[out_elem_idx, out_idx] + (
-        expansion[exp_elem_idx, exp_idx] * transform 
+        expansion[exp_elem_idx, exp_idx] * transform
         * primary_phase[primary_elem_idx] ** (-m) * secondary_phase[secondary_elem_idx] ** (-p)
     )
 
@@ -338,7 +338,7 @@ cdef inline void rotation_inverse_impl(
     cdef Py_ssize_t out_idx = spherical_expansion_index(n, p)
     cdef Py_ssize_t exp_idx = spherical_expansion_index(n, m)
     output[out_elem_idx, out_idx] = output[out_elem_idx, out_idx] + (
-        expansion[exp_elem_idx, exp_idx] * transform 
+        expansion[exp_elem_idx, exp_idx] * transform
         * primary_phase[primary_elem_idx] ** m * secondary_phase[secondary_elem_idx] ** p
     )
 
@@ -369,7 +369,7 @@ cdef void rotation_core_loop(
         trans_idx += 1
         # trans_idx <=> trans[n, 0, 0]
         rot_impl(n, 0, 0, output, expansion, transform[trans_elem_idx, trans_idx], primary_phase, secondary_phase, out_elem_idx, exp_elem_idx, primary_elem_idx, secondary_elem_idx)
-        
+
         for p in range(1, n + 1):
             trans_idx += 1
             # trans_idx <=> trans[n, p, -p]
