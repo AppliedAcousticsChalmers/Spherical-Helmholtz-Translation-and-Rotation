@@ -187,10 +187,10 @@ class CoaxialTranslation(coordinates.OwnerMixin):
 
     Parameters
     ----------
-    input_order : int
-        The order or the input expansions.
-    output_order : int
-        The order of the output expansions.
+    orders : int or (int, int)
+        The orders between which the translation takes place.
+        If given as a single value, it is used for both orders.
+        If given as two values, a mixed order translation is evaluated.
     position
         Positioin specifier, see `shetar.coordinates.Translation`.
     radius : float
@@ -204,29 +204,36 @@ class CoaxialTranslation(coordinates.OwnerMixin):
     _default_output_type = expansions.Expansion
     _transform = staticmethod(_translations.coaxial_translation_transform)
 
-    def __init__(self, input_order, output_order, position=None, radius=None, wavenumber=None, defer_evaluation=False):
-        self._input_order = input_order
-        self._output_order = output_order
+    def __init__(self, orders, position=None, radius=None, wavenumber=None, defer_evaluation=False):
+        try:
+            order_a, order_b = orders
+        except TypeError:
+            order_a = order_b = orders
+        self._low_order = min(order_a, order_b)
+        self._high_order = max(order_a, order_b)
+
         self._wavenumber = np.asarray(wavenumber)
 
         self.coordinate = coordinates.Translation.parse_args(position=position, radius=radius)
-        num_unique = _translations.coaxial_order_to_unique(input_order, output_order)
+        num_unique = _translations.coaxial_order_to_unique(self.low_order, self.high_order)
         self._data = np.zeros(self._coaxial_shape + (num_unique,), self._dtype)
 
         if not defer_evaluation:
             self.evaluate(position=self.coordinate)
 
     @property
-    def order(self):
-        return (self.input_order, self.output_order)
+    def orders(self):
+        if self.low_order == self.high_order:
+            return self.low_order
+        return (self.low_order, self.high_order)
 
     @property
-    def input_order(self):
-        return self._input_order
+    def low_order(self):
+        return self._low_order
 
     @property
-    def output_order(self):
-        return self._output_order
+    def high_order(self):
+        return self._high_order
 
     @property
     def shape(self):
@@ -239,10 +246,8 @@ class CoaxialTranslation(coordinates.OwnerMixin):
 
     def copy(self, deep=False):
         new_obj = super().copy(deep=deep)
-        new_obj._input_order = self._input_order
-        new_obj._output_order = self._output_order
-        new_obj._max_order = self._max_order
-        new_obj._min_order = self._min_order
+        new_obj._low_order = self._low_order
+        new_obj._high_order = self._high_order
         if deep:
             new_obj._wavenumber = self._wavenumber.copy()
             new_obj._data = self._data.copy()
@@ -259,14 +264,14 @@ class CoaxialTranslation(coordinates.OwnerMixin):
         if wavenumber is not None:
             self._wavenumber = np.asarray(wavenumber)
         self.coordinate = coordinates.Translation.parse_args(position=position, radius=radius)
-        self._evaluate(self.coordinate.radius * self.wavenumber, input_order=self.input_order, output_order=self.output_order, out=self._data)
+        self._evaluate(self.coordinate.radius * self.wavenumber, low_order=self.low_order, high_order=self.high_order, out=self._data)
         return self
 
     def apply(self, expansion, inverse=False, out=None):
         wavenumber = getattr(expansion, 'wavenumber', None)
         if wavenumber is not None:
             if not np.allclose(wavenumber, self.wavenumber):
-                raise ValueError('Cannot apply translation to expansion of different wavenuber')
+                raise ValueError('Cannot apply translation to expansion of different wavenumber')
 
         if isinstance(expansion, expansions.Expansion):
             expansion_data = expansion._data
@@ -286,7 +291,7 @@ class CoaxialTranslation(coordinates.OwnerMixin):
                 else:
                     raise TypeError(f'Invalid type {type(out)} for output')
 
-        out_data = self._transform(expansion_data, self._data, self.input_order, self.output_order, inverse=inverse, out=out_data)
+        out_data = self._transform(expansion_data, self._data, self.low_order, self.high_order, inverse=inverse, out=out_data)
 
         if isinstance(out, expansions.Expansion):
             return out
@@ -347,14 +352,17 @@ class Translation(CoaxialTranslation):
     See `shetar.coordinates.Translation` and `CoaxialTranslation` for details on parameters.
     """
 
-    def __init__(self, input_order, output_order, position=None, wavenumber=None,
+    def __init__(self, orders, position=None, wavenumber=None,
                  radius=None, colatitude=None, azimuth=None, defer_evaluation=False):
         coordinate = coordinates.Translation.parse_args(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth)
+        super().__init__(orders=orders, position=coordinate, wavenumber=wavenumber, defer_evaluation=True)
         self._rotation = Rotation(
-            order=max(input_order, output_order), defer_evaluation=True,
+            order=self.high_order, defer_evaluation=True,
             colatitude=coordinate.colatitude, azimuth=coordinate.azimuth,
         )
-        super().__init__(input_order=input_order, output_order=output_order, position=coordinate, wavenumber=wavenumber, defer_evaluation=defer_evaluation)
+
+        if not defer_evaluation:
+            self.evaluate(position=self.coordinate)
 
     def evaluate(self, position=None, wavenumber=None, radius=None, colatitude=None, azimuth=None):
         self.coordinate = coordinates.Translation.parse_args(position=position, radius=radius, colatitude=colatitude, azimuth=azimuth)

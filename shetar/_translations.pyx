@@ -12,58 +12,54 @@ ctypedef fused double_complex:
     double complex
 
 @cython.cdivision(True)
-cdef inline Py_ssize_t coaxial_translation_mode_index(Py_ssize_t mode, Py_ssize_t min_order, Py_ssize_t max_order) nogil:
+cdef inline Py_ssize_t coaxial_translation_mode_index(Py_ssize_t mode, Py_ssize_t low_order, Py_ssize_t high_order) nogil:
     return (
-        mode * (min_order + 1) * (max_order + 1)
-        - mode * (min_order * (min_order + 1)) // 2
-        - max_order * (mode * (mode + 1)) // 2
+        mode * (low_order + 1) * (high_order + 1)
+        - mode * (low_order * (low_order + 1)) // 2
+        - high_order * (mode * (mode + 1)) // 2
         + (mode * (mode - 1) * (mode - 2)) // 6
         - mode
     )
 
 
 @cython.cdivision(True)
-cdef inline Py_ssize_t coaxial_translation_order_index(Py_ssize_t input_order, Py_ssize_t max_order) nogil:
-    return input_order * max_order - (input_order * (input_order - 1)) // 2
+cdef inline Py_ssize_t coaxial_translation_order_index(Py_ssize_t input_order, Py_ssize_t high_order) nogil:
+    return input_order * high_order - (input_order * (input_order - 1)) // 2
 
 
-cdef inline Py_ssize_t coaxial_translation_index(Py_ssize_t input_order, Py_ssize_t output_order, Py_ssize_t mode, Py_ssize_t min_order, Py_ssize_t max_order) nogil:
-    return coaxial_translation_mode_index(mode, min_order, max_order) + coaxial_translation_order_index(input_order, max_order) + output_order
+cdef inline Py_ssize_t coaxial_translation_index(Py_ssize_t input_order, Py_ssize_t output_order, Py_ssize_t mode, Py_ssize_t low_order, Py_ssize_t high_order) nogil:
+    return coaxial_translation_mode_index(mode, low_order, high_order) + coaxial_translation_order_index(input_order, high_order) + output_order
 
 
-def coaxial_order_to_unique(input_order, output_order):
-    min_order = min(input_order, output_order)
-    max_order = max(input_order, output_order)
+def coaxial_order_to_unique(low_order, high_order):
     num_unique = (
-        (min_order + 1)**2 * (max_order + 1)
-        - (min_order * (min_order + 1)) // 2 * (min_order + max_order + 2)
-        + (min_order * (min_order - 1) * (min_order + 1)) // 6
+        (low_order + 1)**2 * (high_order + 1)
+        - (low_order * (low_order + 1)) // 2 * (low_order + high_order + 2)
+        + (low_order * (low_order - 1) * (low_order + 1)) // 6
     )
     return num_unique
 
 
-def coaxial_translation_interdomain_coefficients(distance, input_order, output_order, out=None):
+def coaxial_translation_interdomain_coefficients(distance, Py_ssize_t low_order, Py_ssize_t high_order, out=None):
     output_shape = np.shape(distance)
 
-    num_unique = coaxial_order_to_unique(input_order, output_order)
+    num_unique = coaxial_order_to_unique(low_order, high_order)
     if out is None:
         out = np.zeros(output_shape + (num_unique,), dtype=complex)
     else:
         if out.shape[:-1] != output_shape:
             raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for coaxial translation coefficients with distance shape {output_shape}')
         if out.shape[-1] != num_unique:
-            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for coaxial translation coefficients of {input_order = } and {output_order = }, requiring {num_unique} unique values')
+            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for coaxial translation coefficients of {low_order = } and {high_order = }, requiring {num_unique} unique values')
 
-    buffer_shape = min(input_order, output_order) + 1
+    buffer_shape = low_order + 1
     x_init = distance.reshape((-1, 1))
-    n_init = np.arange(input_order + output_order + 1)
+    n_init = np.arange(low_order + high_order + 1)
     cdef:
         int num_elements = np.size(distance)
         double complex [:, :] initialization = spherical_jn(n_init, x_init) + 1j * spherical_yn(n_init, x_init)
         double complex [:, :] out_cy = out.reshape((-1, num_unique))
-        double complex [:, :] initialization_cy = initialization    
-        Py_ssize_t min_order = min(input_order, output_order)
-        Py_ssize_t max_order = max(input_order, output_order)
+        double complex [:, :] initialization_cy = initialization
         Py_ssize_t idx_elem
         double complex [:] m_buffer = np.zeros(buffer_shape, complex)
         double complex [:] m_minus_one_buffer = np.zeros(buffer_shape, complex)
@@ -74,7 +70,7 @@ def coaxial_translation_interdomain_coefficients(distance, input_order, output_o
         for idx_elem in range(num_elements):
             coaxial_translation_coefficients_calculation(
                 out_cy, initialization_cy, idx_elem,
-                min_order, max_order,
+                low_order, high_order,
                 m_buffer, m_minus_one_buffer,
                 n_minus_one_buffer, n_minus_two_buffer,
             )
@@ -82,27 +78,25 @@ def coaxial_translation_interdomain_coefficients(distance, input_order, output_o
     return out
 
 
-def coaxial_translation_intradomain_coefficients(distance, input_order, output_order, out=None):
+def coaxial_translation_intradomain_coefficients(distance, Py_ssize_t low_order, Py_ssize_t high_order, out=None):
     output_shape = np.shape(distance)
 
-    num_unique = coaxial_order_to_unique(input_order, output_order)
+    num_unique = coaxial_order_to_unique(low_order, high_order)
     if out is None:
         out = np.zeros(output_shape + (num_unique,), dtype=float)
     else:
         if out.shape[:-1] != output_shape:
             raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for coaxial translation coefficients with distance shape {output_shape}')
         if out.shape[-1] != num_unique:
-            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for coaxial translation coefficients of {input_order = } and {output_order = }, requiring {num_unique} unique values')
-    
-    buffer_shape = min(input_order, output_order) + 1
+            raise ValueError(f'Cannot use pre-allocated output of shape {out.shape} for coaxial translation coefficients of {low_order = } and {high_order = }, requiring {num_unique} unique values')
+
+    buffer_shape = low_order + 1
     x_init = distance.reshape((-1, 1))
-    n_init = np.arange(input_order + output_order + 1)
+    n_init = np.arange(low_order + high_order + 1)
     cdef:
         int num_elements = np.size(distance)
         double[:, :] initialization = spherical_jn(n_init, x_init)
         double[:, :] out_cy = out.reshape((-1, num_unique))
-        Py_ssize_t min_order = min(input_order, output_order)
-        Py_ssize_t max_order = max(input_order, output_order)
         Py_ssize_t idx_elem
         double[:] m_buffer = np.zeros(buffer_shape, float)
         double[:] m_minus_one_buffer = np.zeros(buffer_shape, float)
@@ -113,7 +107,7 @@ def coaxial_translation_intradomain_coefficients(distance, input_order, output_o
         for idx_elem in range(num_elements):
             coaxial_translation_coefficients_calculation(
                 out_cy, initialization, idx_elem,
-                min_order, max_order,
+                low_order, high_order,
                 m_buffer, m_minus_one_buffer,
                 n_minus_one_buffer, n_minus_two_buffer,
             )
@@ -157,15 +151,15 @@ cdef void coaxial_translation_coefficients_calculation(
         else:
             # Sectorial values [m, p, m]
             nm_minus_index = m_index + coaxial_translation_order_index(m - 1, P)  # m_index still on the value for m-1
-            m_index = coaxial_translation_mode_index(m, N, P)   
+            m_index = coaxial_translation_mode_index(m, N, P)
             nm_index = m_index + coaxial_translation_order_index(m, P)
-            
+
             for p in range(m, P):  # Sectorial recurrence in the stored range
                 output[idx_elem, nm_index + p] = (  # Calculate [m, p, m]
                     (<double>((p + m - 1) * (p + m) * (2 * m + 1)) / <double>((2 * p - 1) * (2 * p + 1) * (2 * m)))**0.5 * output[idx_elem, nm_minus_index + p - 1]  # [m - 1, p - 1, m - 1]
                     + (<double>((p - m + 1) * (p - m + 2) * (2 * m + 1)) / <double>((2 * p + 1) * (2 * p + 3) * (2 * m)))**0.5 * output[idx_elem, nm_minus_index + p + 1]  # [m - 1, p + 1, m - 1]
                 )
-            output[idx_elem, nm_index + P] = m_buffer[0] = n_minus_one_buffer[0] = (  # Calculate [m, P, m]  
+            output[idx_elem, nm_index + P] = m_buffer[0] = n_minus_one_buffer[0] = (  # Calculate [m, P, m]
                 (<double>((P + m - 1) * (P + m) * (2 * m + 1)) / <double>((2 * P - 1) * (2 * P + 1) * (2 * m)))**0.5 * output[idx_elem, nm_minus_index + P - 1] # [m - 1, P - 1, m - 1]
                 + (<double>((P - m + 1) * (P - m + 2) * (2 * m + 1)) / <double>((2 * P + 1) * (2 * P + 3) * (2 * m)))**0.5 * m_minus_one_buffer[1] # [m - 1, P + 1, m - 1]
             )
@@ -225,19 +219,17 @@ cdef void coaxial_translation_coefficients_calculation(
 
 
 
-def coaxial_translation_transform(expansion_data, coaxial_translation_coefficients, input_order, output_order, inverse=False, out=None):
+def coaxial_translation_transform(expansion_data, coaxial_translation_coefficients, Py_ssize_t low_order, Py_ssize_t high_order, inverse=False, out=None):
     output_shape, expansion_shape, transform_shape = broadcast_shapes(
         expansion_data.shape[:-1], coaxial_translation_coefficients.shape[:-1]
     )
 
-    
-    if coaxial_translation_coefficients.shape[-1] !=  coaxial_order_to_unique(input_order, output_order):
-        raise ValueError(f'Coaxial translation coefficients with {coaxial_translation_coefficients.shape[-1]} unique values does not match specifiend tranfsform orders {input_order, output_order}')
+    if coaxial_translation_coefficients.shape[-1] !=  coaxial_order_to_unique(low_order, high_order):
+        raise ValueError(f'Coaxial translation coefficients with {coaxial_translation_coefficients.shape[-1]} unique values does not match specifiend tranfsform orders {low_order, high_order}')
     expansion_order = int(expansion_data.shape[-1] ** 0.5) - 1
 
-    
     if out is None:
-        result_order = output_order
+        result_order = low_order if expansion_order > low_order else high_order
         out = np.zeros(output_shape + ((result_order + 1)**2,), complex)
     else:
         result_order = int(out.shape[-1] ** 0.5) - 1
@@ -247,19 +239,18 @@ def coaxial_translation_transform(expansion_data, coaxial_translation_coefficien
     # Checks for order.
     # This will maintain the relation between expantion_order and result_order if they are different,
     # but truncate them to the allowable order in the transform if needed.
-    # If they are equal, they will be truncated to the input order and output order if needed.
-    min_order = min(input_order, output_order)
-    max_order = max(input_order, output_order)
+    # If they are equal, they will be truncated to the low order if needed.
     if expansion_order < result_order:
-        expansion_order = min(expansion_order, min_order)
-        result_order = min(result_order, max_order)
+        expansion_order = min(expansion_order, low_order)
+        result_order = min(result_order, high_order)
     elif result_order < expansion_order:
-        result_order = min(result_order, min_order)
-        expansion_order = min(expansion_order, max_order)
+        result_order = min(result_order, low_order)
+        expansion_order = min(expansion_order, high_order)
     else:
         # expansion_order == result_order
-        expansion_order = min(expansion_order, input_order)
-        result_order = min(result_order, output_order)
+        # If the input/output both are higher than the low order, we cannot possiby guess which of the two should be keps as the high one, so we truncate both of them instead.
+        expansion_order = min(expansion_order, low_order)
+        result_order = min(result_order, low_order)
 
     if not np.iscomplexobj(coaxial_translation_coefficients):
         # We need a complex object so that the assignment wont break.
@@ -273,22 +264,20 @@ def coaxial_translation_transform(expansion_data, coaxial_translation_coefficien
         double complex [:, :] exp_cy = expansion_data.reshape((-1, expansion_data.shape[-1]))
         double complex[:, :] trans_cy = coaxial_translation_coefficients.reshape((-1, coaxial_translation_coefficients.shape[-1]))
         translation_implementation trans_func
-        Py_ssize_t N, P, L, U
+        Py_ssize_t N_max, P_max
 
-    L = min_order
-    U = max_order
     if inverse:
         trans_func = inverse_coaxial_implementation
-        N = result_order
-        P = expansion_order
+        N_max = result_order
+        P_max = expansion_order
     else:
         trans_func = forward_coaxial_implementation
-        P = result_order
-        N = expansion_order
+        P_max = result_order
+        N_max = expansion_order
 
     if out.size == out.shape[-1]:
         # No loop over elements
-        coaxial_translation_transform_calculation(out_cy, exp_cy, trans_cy, 0, 0, 0, N, P, L, U, trans_func)
+        coaxial_translation_transform_calculation(out_cy, exp_cy, trans_cy, 0, 0, 0, N_max, P_max, low_order, high_order, trans_func)
         return out
 
     cdef:
@@ -302,7 +291,7 @@ def coaxial_translation_transform(expansion_data, coaxial_translation_coefficien
         for out_elem_idx in range(num_elements):
             exp_elem_idx = broadcast_index(out_elem_idx, exp_stride, out_stride, ndim)
             trans_elem_idx = broadcast_index(out_elem_idx, trans_stride, out_stride, ndim)
-            coaxial_translation_transform_calculation(out_cy, exp_cy, trans_cy, out_elem_idx, exp_elem_idx, trans_elem_idx, N, P, L, U, trans_func)
+            coaxial_translation_transform_calculation(out_cy, exp_cy, trans_cy, out_elem_idx, exp_elem_idx, trans_elem_idx, N_max, P_max, low_order, high_order, trans_func)
 
     return out
 
@@ -368,8 +357,8 @@ cdef void coaxial_translation_transform_calculation(
     Py_ssize_t trans_elem_idx,
     Py_ssize_t N_max,
     Py_ssize_t P_max,
-    Py_ssize_t min_order,
-    Py_ssize_t max_order,
+    Py_ssize_t low_order,
+    Py_ssize_t high_order,
     translation_implementation trans_func,
 ) nogil:
     cdef:
@@ -377,8 +366,8 @@ cdef void coaxial_translation_transform_calculation(
         short sign
         Py_ssize_t NP_min = min(N_max, P_max)
         Py_ssize_t NP_max = max(N_max, P_max)
-        Py_ssize_t N_skip = ((min_order - NP_min) * (2 * max_order - min_order - NP_min + 1))//2
-        Py_ssize_t P_skip = (max_order - NP_max)
+        Py_ssize_t N_skip = ((low_order - NP_min) * (2 * high_order - low_order - NP_min + 1))//2
+        Py_ssize_t P_skip = (high_order - NP_max)
     # comments indicate [n, p, m]
     trans_idx = -1
     # deal with m=0, since that removes the -m symmetry

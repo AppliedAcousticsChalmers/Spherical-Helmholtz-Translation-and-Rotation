@@ -55,7 +55,7 @@ def source_expansion(input_order, source_position, num_initial_sources):
     source_positions = source_position + np.random.normal(loc=0, scale=0.1, size=(num_initial_sources, 3))
     source_expansion = shetar.expansions.Expansion(data=source_amplitudes[None, :]).apply(
         shetar.transforms.InteriorTranslation(
-            input_order=0, output_order=input_order,
+            orders=(0, input_order),
             position=source_positions, wavenumber=1
         )
     )
@@ -91,7 +91,7 @@ def translated_bases(translated_field_points, output_order, wavenumber):
 @pytest.fixture(scope='module')
 def translated_expansion(source_expansion, new_origin, output_order, wavenumber):
     translation = shetar.transforms.InteriorTranslation(
-        input_order=source_expansion.order, output_order=output_order,
+        orders=(source_expansion.order, output_order),
         position=-new_origin, wavenumber=wavenumber
     )
     translated_expansion = source_expansion.apply(translation)

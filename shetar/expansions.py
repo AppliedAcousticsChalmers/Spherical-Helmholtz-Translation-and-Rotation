@@ -236,7 +236,7 @@ class InteriorExpansion(Expansion):
     def translate(self, position=None, order=None, radius=None, colatitude=None, azimuth=None):
         from .transforms import InteriorTranslation
         return InteriorTranslation(
-            input_order=self.order, output_order=self.order if order is None else order,
+            orders=(self.order, self.order if order is None else order),
             position=position, radius=radius, colatitude=colatitude, azimuth=azimuth,
             wavenumber=self.wavenumber
         ).apply(self)
@@ -267,7 +267,7 @@ class ExteriorExpansion(Expansion):
         else:
             raise ValueError(f'Unknown domain `{domain}`')
         return TranslationCls(
-            input_order=self.order, output_order=self.order if order is None else order,
+            orders=(self.order, self.order if order is None else order),
             position=position, radius=radius, colatitude=colatitude, azimuth=azimuth,
             wavenumber=self.wavenumber
         ).apply(self)
